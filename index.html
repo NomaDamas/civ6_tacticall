@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Civ VI Remote Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              display: ['"Bebas Neue"', 'ui-sans-serif', 'system-ui'],
+              body: ['"Space Grotesk"', 'ui-sans-serif', 'system-ui'],
+            },
+            colors: {
+              panel: '#111827',
+              panelSoft: '#1f2937',
+              accent: '#22c55e',
+              danger: '#ef4444',
+              warning: '#f59e0b',
+            },
+            boxShadow: {
+              glow: '0 0 0 1px rgba(34,197,94,.35), 0 14px 36px rgba(34,197,94,.2)',
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        min-height: 100svh;
+        background:
+          radial-gradient(1100px 560px at 0% -20%, rgba(34, 197, 94, 0.22), transparent 60%),
+          radial-gradient(980px 560px at 100% -15%, rgba(16, 185, 129, 0.14), transparent 60%),
+          linear-gradient(180deg, #020617 0%, #0b1220 60%, #020617 100%);
+      }
+      .scanlines::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.022),
+          rgba(255, 255, 255, 0.022) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        mix-blend-mode: soft-light;
+      }
+      @keyframes pulse-ring {
+        0% {
+          box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+        }
+        100% {
+          box-shadow: 0 0 0 16px rgba(34, 197, 94, 0);
+        }
+      }
+      .live-ring {
+        animation: pulse-ring 1.8s infinite;
+      }
+    </style>
+  </head>
+  <body class="font-body text-slate-100 antialiased">
+    <main class="relative mx-auto min-h-svh w-full max-w-6xl p-3 pb-6 sm:p-5 scanlines">
+      <section class="rounded-2xl border border-emerald-400/20 bg-panel/85 p-4 shadow-glow backdrop-blur sm:p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 class="font-display text-3xl leading-none tracking-wide text-emerald-300 sm:text-4xl">Civ VI Command</h1>
+            <p class="mt-1 text-xs text-slate-400 sm:text-sm">Remote Tactical Dashboard (Mobile + Desktop)</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="connectionBadge" class="rounded-full border border-slate-500/60 px-2 py-1 text-xs font-semibold text-slate-300">
+              Disconnected
+            </span>
+          </div>
+        </div>
+        <div class="mt-4 rounded-xl border border-slate-700/70 bg-panelSoft/80 p-3">
+          <p class="text-[11px] uppercase tracking-widest text-slate-400">Agent Status</p>
+          <div class="mt-1 flex items-center gap-2">
+            <span id="statusDot" class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+            <p id="agentStatus" class="text-lg font-semibold text-slate-100">Idle</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-3 grid gap-3 lg:grid-cols-3">
+        <div class="flex min-h-0 flex-col gap-3 lg:col-span-1">
+          <section class="rounded-2xl border border-slate-700/70 bg-panel/90 p-3 shadow-lg backdrop-blur sm:p-4">
+            <p class="mb-2 text-[11px] uppercase tracking-widest text-slate-400">Remote Link</p>
+            <div class="space-y-2">
+              <input
+                id="wsUrl"
+                type="text"
+                inputmode="url"
+                autocomplete="off"
+                class="w-full rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                placeholder="wss://your-relay-domain/ws"
+              />
+              <button
+                id="connectBtn"
+                class="w-full rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-2.5 text-sm font-semibold text-emerald-300 active:scale-[0.98]"
+              >
+                Connect
+              </button>
+              <button
+                id="forgetBtn"
+                class="w-full rounded-lg border border-slate-500/40 bg-slate-700/30 px-3 py-2.5 text-sm font-semibold text-slate-200 active:scale-[0.98]"
+              >
+                Forget Device Login
+              </button>
+            </div>
+            <p class="mt-2 text-xs text-slate-400">호스트 PC의 QR을 스캔하면 첫 로그인 후 자동 로그인됩니다.</p>
+          </section>
+
+          <section class="rounded-2xl border border-slate-700/70 bg-panel/90 p-3 shadow-lg backdrop-blur sm:p-4">
+            <p class="mb-2 text-[11px] uppercase tracking-widest text-slate-400">Agent Control</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                id="startAgentBtn"
+                class="rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-3 py-2.5 text-sm font-bold text-emerald-200 active:scale-[0.98]"
+              >
+                Start Agent
+              </button>
+              <button
+                id="stopAgentBtn"
+                class="rounded-xl border border-rose-400/50 bg-rose-500/20 px-3 py-2.5 text-sm font-bold text-rose-200 active:scale-[0.98]"
+              >
+                Stop Agent
+              </button>
+            </div>
+            <p class="mt-2 text-xs text-slate-400">HITL Computer-use agent 실행/중지를 원격 제어합니다.</p>
+          </section>
+
+          <section class="rounded-2xl border border-slate-700/70 bg-panel/90 p-3 shadow-lg backdrop-blur sm:p-4">
+            <label for="commandInput" class="mb-2 block text-[11px] uppercase tracking-widest text-slate-400">Command Input</label>
+            <textarea
+              id="commandInput"
+              rows="4"
+              placeholder="예: 다음 턴 종료 / 과학 중심 확장 / 로마와 전쟁 준비"
+              class="w-full resize-none rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            ></textarea>
+            <div class="mt-3 grid grid-cols-[1fr_auto] gap-2">
+              <button
+                id="sendBtn"
+                class="rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-3 text-sm font-bold text-emerald-200 active:scale-[0.98]"
+              >
+                Send Command
+              </button>
+              <button
+                id="voiceBtn"
+                aria-label="Start voice input"
+                class="h-12 w-12 rounded-full border border-cyan-300/40 bg-cyan-500/20 text-sm font-bold text-cyan-100 active:scale-[0.96]"
+                title="Voice Input"
+              >
+                Mic
+              </button>
+            </div>
+            <p id="voiceHint" class="mt-2 min-h-5 text-xs text-slate-400"></p>
+          </section>
+        </div>
+
+        <section class="flex min-h-[40svh] flex-col rounded-2xl border border-slate-700/70 bg-panel/90 p-3 shadow-lg backdrop-blur sm:p-4 lg:col-span-2 lg:min-h-[68svh]">
+          <div class="mb-2">
+            <p class="text-[11px] uppercase tracking-widest text-slate-400">Agent State Snapshot</p>
+            <pre
+              id="agentStateView"
+              class="mt-2 max-h-40 overflow-auto rounded-lg border border-slate-700 bg-slate-950/70 p-2 font-mono text-[11px] leading-relaxed text-slate-300"
+            >{}</pre>
+          </div>
+          <div class="mb-2 flex items-center justify-between">
+            <p class="text-[11px] uppercase tracking-widest text-slate-400">Action Logs</p>
+            <button id="clearLogsBtn" class="text-xs text-slate-400 underline underline-offset-2">Clear</button>
+          </div>
+          <div
+            id="logs"
+            class="min-h-48 flex-1 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/60 p-2 font-mono text-xs leading-relaxed"
+          ></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

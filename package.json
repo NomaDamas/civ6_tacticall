@@ -1,0 +1,16 @@
+{
+  "name": "civ6-agent-remote-controller",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Civ VI remote controller with relay server and host bridge",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "host": "node bridge.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.1"
+  }
+}

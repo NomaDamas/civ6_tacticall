@@ -1,8 +1,8 @@
 {
-  "name": "civ6-agent-remote-controller",
+  "name": "ojirapper",
   "version": "2.0.0",
   "private": true,
-  "description": "Civ VI remote controller with relay server and host bridge",
+  "description": "ojirapper remote controller with relay server and host bridge",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",

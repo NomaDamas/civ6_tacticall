@@ -1,4 +1,4 @@
-# Civ VI Remote Command Center (QR Auto-Login)
+# ojirapper (QR Auto-Login)
 
 목표: 로컬 Civ6 Computer Use Agent(HITL)가 QR을 발급하고, 휴대폰이 스캔하면 즉시 연결/송수신.
 

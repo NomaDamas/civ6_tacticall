@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: civ6-remote-controller
+    name: ojirapper
     env: node
     plan: free
     buildCommand: npm install

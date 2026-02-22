@@ -1,4 +1,5 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { WebSocket } = require('ws');
 const QRCode = require('qrcode');
@@ -31,16 +32,53 @@ function guessControllerBaseUrl(relayUrl) {
   return raw.replace(/\/ws$/, '');
 }
 
+function detectLanIp() {
+  const nics = os.networkInterfaces();
+  for (const entries of Object.values(nics)) {
+    if (!entries) continue;
+    for (const item of entries) {
+      if (!item || item.family !== 'IPv4' || item.internal) continue;
+      const ip = item.address;
+      if (/^10\./.test(ip) || /^192\.168\./.test(ip) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) {
+        return ip;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+function buildAutoControllerBaseUrl(relayUrl, explicitBaseUrl) {
+  const base = String(explicitBaseUrl || '').trim();
+  if (base && base.toLowerCase() !== 'auto') return base;
+
+  const relay = String(relayUrl || '').trim();
+  if (relay.startsWith('wss://')) return relay.replace('wss://', 'https://').replace(/\/ws$/, '');
+  if (relay.startsWith('ws://') && !/ws:\/\/(localhost|127\.0\.0\.1)/.test(relay)) {
+    return relay.replace('ws://', 'http://').replace(/\/ws$/, '');
+  }
+
+  const lanIp = detectLanIp();
+  return `http://${lanIp}:8787`;
+}
+
 const fileConfig = loadHostConfigFile();
 
+const relayUrl = readArg(
+  'relay',
+  process.env.RELAY_URL || fileConfig.relayUrl || 'ws://127.0.0.1:8787/ws',
+);
+
 const config = {
-  relayUrl: readArg('relay', process.env.RELAY_URL || fileConfig.relayUrl || 'ws://localhost:8787/ws'),
+  relayUrl,
   localAgentUrl: readArg('local', process.env.LOCAL_AGENT_URL || fileConfig.localAgentUrl || 'ws://localhost:8000/ws'),
   roomId: readArg('room', process.env.ROOM_ID || fileConfig.roomId || 'civ6-room'),
   hostKey: readArg('host-key', process.env.HOST_KEY || fileConfig.hostKey || ''),
-  controllerBaseUrl: readArg(
-    'controller-base-url',
-    process.env.CONTROLLER_BASE_URL || fileConfig.controllerBaseUrl || guessControllerBaseUrl(fileConfig.relayUrl || process.env.RELAY_URL || 'ws://localhost:8787/ws'),
+  controllerBaseUrl: buildAutoControllerBaseUrl(
+    relayUrl,
+    readArg(
+      'controller-base-url',
+      process.env.CONTROLLER_BASE_URL || fileConfig.controllerBaseUrl || '',
+    ),
   ),
 };
 
@@ -53,7 +91,6 @@ let relayWs = null;
 let localWs = null;
 let relayTimer = null;
 let localTimer = null;
-let qrRefreshTimer = null;
 
 function log(kind, msg) {
   const ts = new Date().toISOString();
@@ -83,15 +120,6 @@ async function printQr(url, expiresAt) {
     log('pair', `QR render failed: ${error.message}`);
     log('pair', `Open URL manually: ${url}`);
   }
-}
-
-function scheduleQrRefresh() {
-  if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
-  qrRefreshTimer = setTimeout(() => {
-    qrRefreshTimer = null;
-    requestPairQr();
-    scheduleQrRefresh();
-  }, 90 * 1000);
 }
 
 function connectRelay() {
@@ -125,7 +153,6 @@ function connectRelay() {
       log('relay', `authenticated to room '${config.roomId}'`);
       safeSend(relayWs, { type: 'status', status: 'Idle' });
       requestPairQr();
-      scheduleQrRefresh();
       return;
     }
 
@@ -169,10 +196,6 @@ function connectRelay() {
   relayWs.on('close', (code) => {
     log('relay', `closed (${code})`);
     relayWs = null;
-    if (qrRefreshTimer) {
-      clearTimeout(qrRefreshTimer);
-      qrRefreshTimer = null;
-    }
     if (!relayTimer) {
       relayTimer = setTimeout(() => {
         relayTimer = null;
@@ -183,6 +206,9 @@ function connectRelay() {
 
   relayWs.on('error', (err) => {
     log('relay', `error: ${err.message}`);
+    if (String(err.message || '').includes('ECONNREFUSED')) {
+      log('relay', 'hint: run `npm start` first, and use ws://127.0.0.1:8787/ws for local relay');
+    }
   });
 }
 
@@ -212,6 +238,18 @@ function connectLocal() {
         if (typeof statusGuess === 'string' && statusGuess.trim()) {
           safeSend(relayWs, { type: 'status', status: statusGuess.trim() });
         }
+        return;
+      }
+
+      if (msg.type === 'video_frame' && typeof msg.data === 'string') {
+        safeSend(relayWs, {
+          type: 'video_frame',
+          data: msg.data,
+          mime: typeof msg.mime === 'string' ? msg.mime : 'image/jpeg',
+          width: Number(msg.width || 0) || undefined,
+          height: Number(msg.height || 0) || undefined,
+          ts: msg.ts || Date.now(),
+        });
         return;
       }
 
@@ -250,3 +288,19 @@ function connectLocal() {
 
 connectRelay();
 connectLocal();
+
+if (process.stdin.isTTY) {
+  process.stdin.setEncoding('utf8');
+  process.stdin.resume();
+  log('pair', "manual QR refresh: type 'r' (or 'qr') then Enter");
+  process.stdin.on('data', (chunk) => {
+    const cmd = String(chunk || '').trim().toLowerCase();
+    if (cmd === 'r' || cmd === 'qr' || cmd === 'refresh') {
+      requestPairQr();
+      return;
+    }
+    if (cmd) {
+      log('pair', `unknown command: ${cmd} (use 'r' to refresh QR)`);
+    }
+  });
+}

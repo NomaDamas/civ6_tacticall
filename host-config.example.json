@@ -1,6 +1,6 @@
 {
-  "relayUrl": "wss://YOUR_DOMAIN/ws",
-  "controllerBaseUrl": "https://YOUR_DOMAIN",
+  "relayUrl": "ws://127.0.0.1:8787/ws",
+  "controllerBaseUrl": "auto",
   "localAgentUrl": "ws://localhost:8000/ws",
   "roomId": "my-room",
   "hostKey": "change-this-host-key"

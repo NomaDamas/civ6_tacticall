@@ -8,6 +8,10 @@
     isListening: false,
     isAuthed: false,
     qrPairTokenFromUrl: '',
+    frameCount: 0,
+    lastFrameAt: 0,
+    lastNoFrameWarnAt: 0,
+    wsMessageCount: 0,
   };
 
   const ui = {
@@ -17,6 +21,8 @@
     connectionBadge: document.getElementById('connectionBadge'),
     agentStatus: document.getElementById('agentStatus'),
     statusDot: document.getElementById('statusDot'),
+    liveView: document.getElementById('liveView'),
+    liveMeta: document.getElementById('liveMeta'),
     startAgentBtn: document.getElementById('startAgentBtn'),
     stopAgentBtn: document.getElementById('stopAgentBtn'),
     commandInput: document.getElementById('commandInput'),
@@ -39,6 +45,7 @@
     loadSavedConfig();
     bindEvents();
     renderAgentState({});
+    startDebugMonitors();
     connect();
     log('system', 'Controller initialized');
   }
@@ -190,6 +197,12 @@
     }
 
     if (!parsed || typeof parsed !== 'object') return;
+    state.wsMessageCount += 1;
+    if (parsed.type) {
+      console.debug(`[ws] type=${parsed.type}`);
+    } else {
+      console.debug('[ws] message without type');
+    }
 
     if (parsed.type === 'auth_ok') {
       state.isAuthed = true;
@@ -242,6 +255,11 @@
 
     if (parsed.type === 'message' && typeof parsed.message === 'string') {
       log('agent', parsed.message);
+      return;
+    }
+
+    if (parsed.type === 'video_frame') {
+      renderVideoFrame(parsed);
       return;
     }
 
@@ -305,6 +323,43 @@
     } catch {
       ui.agentStateView.textContent = '{}';
     }
+  }
+
+  function renderVideoFrame(payload) {
+    const mime = typeof payload.mime === 'string' ? payload.mime : 'image/jpeg';
+    const base64Data = typeof payload.data === 'string' ? payload.data : '';
+    if (!base64Data) return;
+
+    const src = base64Data.startsWith('data:') ? base64Data : `data:${mime};base64,${base64Data}`;
+    ui.liveView.src = src;
+
+    const now = Date.now();
+    state.frameCount += 1;
+    let fpsText = '';
+    if (state.lastFrameAt > 0) {
+      const dt = now - state.lastFrameAt;
+      if (dt > 0) fpsText = `${(1000 / dt).toFixed(1)} fps`;
+    }
+    state.lastFrameAt = now;
+
+    const sizeText = payload.width && payload.height ? `${payload.width}x${payload.height}` : '';
+    ui.liveMeta.textContent = [fpsText, sizeText, `frames:${state.frameCount}`].filter(Boolean).join(' | ') || 'Streaming';
+  }
+
+  function startDebugMonitors() {
+    setInterval(() => {
+      const now = Date.now();
+      const msSinceFrame = state.lastFrameAt > 0 ? now - state.lastFrameAt : -1;
+
+      if (msSinceFrame > 5000 && now - state.lastNoFrameWarnAt > 5000) {
+        state.lastNoFrameWarnAt = now;
+        console.warn(`[video] no frame for ${msSinceFrame}ms`);
+      }
+
+      console.debug(
+        `[debug] ws_messages=${state.wsMessageCount} frames=${state.frameCount} last_frame_ms=${msSinceFrame}`,
+      );
+    }, 5000);
   }
 
   function log(kind, message) {

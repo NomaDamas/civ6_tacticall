@@ -1,29 +1,29 @@
 # ojirapper (QR Auto-Login)
 
-목표: 로컬 Civ6 Computer Use Agent(HITL)가 QR을 발급하고, 휴대폰이 스캔하면 즉시 연결/송수신.
+Goal: let a local Civ6 Computer Use Agent (HITL) generate a QR code so a phone can scan it and instantly connect for real-time command/state exchange.
 
-## 구성
+## Components
 
-- `server.js`: 배포용 웹 + WebSocket 릴레이 (`/ws`)
-- `bridge.js`: HITL PC에서 로컬 FastAPI WS(`ws://localhost:8000/ws`)와 릴레이를 연결
-- `index.html`, `app.js`: 모바일/데스크톱 반응형 웹 컨트롤러
+- `server.js`: deployable web app + WebSocket relay (`/ws`)
+- `bridge.js`: runs on the HITL PC and bridges local FastAPI WS (`ws://localhost:8000/ws`) to the relay
+- `index.html`, `app.js`: mobile/desktop responsive web controller
 
-## 동작 방식
+## How It Works
 
-1. HITL PC의 `bridge.js`가 릴레이에 host로 인증
-2. `bridge.js`가 서버에 `create_pair_qr` 요청
-3. 서버가 1회용 `pairUrl` 발급
-4. `bridge.js`가 터미널에 QR 출력
-5. 휴대폰이 QR 스캔해 `/?pair=...`로 접속
-6. 웹이 자동으로 `qr_pair_login` 수행, 디바이스 토큰 저장
-7. 이후 같은 폰/브라우저는 자동 로그인 (`token_login`)
+1. `bridge.js` on the HITL PC authenticates to the relay as `host`
+2. `bridge.js` requests `create_pair_qr` from the relay
+3. Relay issues a one-time `pairUrl`
+4. `bridge.js` prints a QR code in the terminal
+5. Phone scans QR and opens `/?pair=...`
+6. Web client performs `qr_pair_login` and stores a device token
+7. Same phone/browser can auto-login afterward via `token_login`
 
-## 컨트롤 메시지
+## Control Messages
 
-컨트롤러 -> HITL 에이전트로 전달되는 메시지:
+Controller -> HITL agent messages:
 
 ```json
-{ "type": "command", "content": "자연어 명령" }
+{ "type": "command", "content": "natural language command" }
 ```
 
 ```json
@@ -34,68 +34,84 @@
 { "type": "control", "action": "stop" }
 ```
 
-`Start Agent`/`Stop Agent` 버튼은 위 `control` 메시지를 전송합니다.
+The `Start Agent` / `Stop Agent` buttons send the `control` messages above.
 
-HITL 에이전트 -> 컨트롤러 상태 전송:
+HITL agent -> controller state messages:
 
 ```json
 { "type": "status", "data": { "state": "RUNNING", "step": 12, "task": "..." } }
 ```
 
-또는
+or
 
 ```json
 { "type": "agent_state", "data": { "state": "RUNNING", "step": 12 } }
 ```
 
-웹은 `Agent State Snapshot` 패널에 JSON을 그대로 표시합니다.
+The web UI renders this JSON directly in `Agent State Snapshot`.
 
-## 로컬 개발
+HITL agent -> controller live video frame message:
+
+```json
+{
+  "type": "video_frame",
+  "mime": "image/jpeg",
+  "data": "<base64 JPEG bytes>",
+  "width": 1280,
+  "height": 720,
+  "ts": 1730000000000
+}
+```
+
+The web UI renders this in `Live View` in real time.
+
+## Local Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-웹: `http://localhost:8787`
+Web URL: `http://localhost:8787`
 
-## 배포
+## Deployment
 
 - Start command: `npm start`
-- HTTPS 도메인 필수
+- Use an HTTPS domain in production
 - WebSocket endpoint: `wss://YOUR_DOMAIN/ws`
 
-### Render로 배포(추천)
+### Deploy on Render (Recommended)
 
-1. 이 저장소를 GitHub에 push
-2. Render에서 `New +` -> `Blueprint` 선택 후 repo 연결
-3. `render.yaml`을 읽어 자동으로 웹서비스 생성
-4. 환경변수 `PUBLIC_BASE_URL=https://YOUR_DOMAIN` 입력
-5. Render 기본 URL 확인 후 Custom Domain에서 도메인 연결
+1. Push this repository to GitHub
+2. In Render, select `New +` -> `Blueprint` and connect the repo
+3. Render reads `render.yaml` and creates the web service
+4. Set `PUBLIC_BASE_URL=https://YOUR_DOMAIN`
+5. Verify the Render URL, then attach your custom domain
 
-## HITL PC 설정 (최초 1회)
+## HITL PC Setup (One-Time)
 
 ```bash
 cp host-config.example.json host-config.json
 ```
 
-`host-config.json` 예:
+Example `host-config.json`:
 
-- `relayUrl`: `wss://YOUR_DOMAIN/ws`
-- `controllerBaseUrl`: `https://YOUR_DOMAIN`
+- `relayUrl`: use `ws://127.0.0.1:8787/ws` for local test, `wss://YOUR_DOMAIN/ws` for deployed domain
+- `controllerBaseUrl`: `auto` recommended (auto-detects current LAN IP for QR URL)
 - `localAgentUrl`: `ws://localhost:8000/ws`
-- `roomId`: 원하는 방 이름
-- `hostKey`: 긴 비밀 문자열
+- `roomId`: any room name you want
+- `hostKey`: long secret string
 
-실행:
+Run:
 
 ```bash
 npm run host
 ```
 
-실행하면 터미널에 Pair QR이 자동 출력됩니다.
+The pair QR is printed in the terminal.
+To regenerate QR manually, in the `npm run host` terminal type `r` then press Enter.
 
-## 사용자 접속
+## User Access
 
-- 휴대폰으로 QR 스캔 -> 웹 열림 -> 자동 연결
-- 재로그인 필요 시 웹에서 `Forget Device Login`
+- Scan the QR from phone -> web opens -> auto-connect
+- Use `Forget Device Login` in the web UI if re-pairing is needed

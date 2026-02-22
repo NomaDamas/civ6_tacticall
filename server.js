@@ -269,6 +269,18 @@ function handleAuthedMessage(ws, msg) {
       return;
     }
 
+    if (msg.type === 'video_frame' && typeof msg.data === 'string') {
+      broadcastToControllers(room, {
+        type: 'video_frame',
+        data: msg.data,
+        mime: typeof msg.mime === 'string' ? msg.mime : 'image/jpeg',
+        width: Number(msg.width || 0) || undefined,
+        height: Number(msg.height || 0) || undefined,
+        ts: msg.ts || Date.now(),
+      });
+      return;
+    }
+
     if (typeof msg.content === 'string') {
       broadcastToControllers(room, { type: 'message', message: msg.content });
     }

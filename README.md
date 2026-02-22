@@ -1,22 +1,22 @@
 # ojirapper (QR Auto-Login)
 
-Goal: let a local Civ6 Computer Use Agent (HITL) generate a QR code so a phone can scan it and instantly connect for real-time command/state exchange.
+Goal: allow a local Civ6 Computer Use Agent (HITL) to generate a QR code so a phone can scan it and connect instantly for real-time command and state exchange.
 
 ## Components
 
 - `server.js`: deployable web app + WebSocket relay (`/ws`)
-- `bridge.js`: runs on the HITL PC and bridges local FastAPI WS (`ws://localhost:8000/ws`) to the relay
-- `index.html`, `app.js`: mobile/desktop responsive web controller
+- `bridge.js`: runs on the HITL PC and bridges the local FastAPI WebSocket (`ws://localhost:8000/ws`) to the relay
+- `index.html`, `app.js`: responsive web controller for mobile and desktop
 
 ## How It Works
 
 1. `bridge.js` on the HITL PC authenticates to the relay as `host`
-2. `bridge.js` requests `create_pair_qr` from the relay
+2. `bridge.js` requests `create_pair_qr` from the relay server
 3. Relay issues a one-time `pairUrl`
 4. `bridge.js` prints a QR code in the terminal
 5. Phone scans QR and opens `/?pair=...`
-6. Web client performs `qr_pair_login` and stores a device token
-7. Same phone/browser can auto-login afterward via `token_login`
+6. The web client performs `qr_pair_login` and stores a device token
+7. The same phone/browser can auto-login later via `token_login`
 
 ## Control Messages
 
@@ -100,7 +100,7 @@ Example `host-config.json`:
 - `controllerBaseUrl`: `auto` recommended (auto-detects current LAN IP for QR URL)
 - `localApiBaseUrl`: local FastAPI base URL used by Discussion endpoint (e.g. `http://127.0.0.1:8765`)
 - `localAgentUrl`: `ws://localhost:8000/ws`
-- `discussionUserId`: user id for discussion session tracking (default `web_user`)
+- `discussionUserId`: user ID for discussion session tracking (default `web_user`)
 - `discussionMode`: one of `pre_game`, `in_game`, `post_turn` (default `in_game`)
 - `discussionLanguage`: default language hint sent to FastAPI (`ko`, `en`, `ja`, `zh`; default `ko`)
 - `roomId`: any room name you want
@@ -112,8 +112,8 @@ Run:
 npm run host
 ```
 
-The pair QR is printed in the terminal.
-To regenerate QR manually, in the `npm run host` terminal type `r` then press Enter.
+The pairing QR code is printed in the terminal.
+To regenerate the QR code manually, type `r` in the `npm run host` terminal, then press Enter.
 
 ## Discussion Toggle
 
@@ -129,5 +129,5 @@ To regenerate QR manually, in the `npm run host` terminal type `r` then press En
 
 ## User Access
 
-- Scan the QR from phone -> web opens -> auto-connect
+- Scan the QR code with your phone -> the web app opens -> auto-connect starts
 - Use `Forget Device Login` in the web UI if re-pairing is needed

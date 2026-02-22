@@ -1,7 +1,11 @@
 {
   "relayUrl": "ws://127.0.0.1:8787/ws",
   "controllerBaseUrl": "auto",
+  "localApiBaseUrl": "http://127.0.0.1:8765",
   "localAgentUrl": "ws://localhost:8000/ws",
+  "discussionUserId": "web_user",
+  "discussionMode": "in_game",
+  "discussionLanguage": "ko",
   "roomId": "my-room",
   "hostKey": "change-this-host-key"
 }

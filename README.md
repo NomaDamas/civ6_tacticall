@@ -98,7 +98,11 @@ Example `host-config.json`:
 
 - `relayUrl`: use `ws://127.0.0.1:8787/ws` for local test, `wss://YOUR_DOMAIN/ws` for deployed domain
 - `controllerBaseUrl`: `auto` recommended (auto-detects current LAN IP for QR URL)
+- `localApiBaseUrl`: local FastAPI base URL used by Discussion endpoint (e.g. `http://127.0.0.1:8765`)
 - `localAgentUrl`: `ws://localhost:8000/ws`
+- `discussionUserId`: user id for discussion session tracking (default `web_user`)
+- `discussionMode`: one of `pre_game`, `in_game`, `post_turn` (default `in_game`)
+- `discussionLanguage`: default language hint sent to FastAPI (`ko`, `en`, `ja`, `zh`; default `ko`)
 - `roomId`: any room name you want
 - `hostKey`: long secret string
 
@@ -110,6 +114,18 @@ npm run host
 
 The pair QR is printed in the terminal.
 To regenerate QR manually, in the `npm run host` terminal type `r` then press Enter.
+
+## Discussion Toggle
+
+- Open the `Discussion` toggle in the controller UI.
+- It sends the chat text to FastAPI `POST /api/discuss` via bridge.
+- Bridge payload:
+  ```json
+  { "user_id": "web_user", "message": "....", "mode": "in_game", "language": "ko" }
+  ```
+- The server-side engine uses latest strategy/context internally and returns `response`.
+- You can copy the LLM suggestion into the main Command box.
+- The controller has a `Discussion Language` setting. Selected value is sent in each discussion query.
 
 ## User Access
 

@@ -206,14 +206,13 @@ function handleAuthedMessage(ws, msg) {
   if (!room) return;
 
   if (ws.meta.role === 'controller') {
-    if (!room.host || !isSocketOpen(room.host)) {
-      safeSend(ws, { type: 'message', message: 'Host is offline' });
-      return;
-    }
-
     if (msg.type === 'command') {
       const content = String(msg.content || '').trim();
       if (!content) return;
+      if (!room.host || !isSocketOpen(room.host)) {
+        safeSend(ws, { type: 'message', message: 'Host is offline. Command not delivered.' });
+        return;
+      }
 
       safeSend(room.host, {
         type: 'command',
@@ -227,10 +226,32 @@ function handleAuthedMessage(ws, msg) {
     if (msg.type === 'control') {
       const action = String(msg.action || '').trim();
       if (!action) return;
+      if (!room.host || !isSocketOpen(room.host)) {
+        safeSend(ws, { type: 'message', message: 'Host is offline. Control not delivered.' });
+        return;
+      }
 
       safeSend(room.host, {
         type: 'control',
         action,
+        roomId: room.roomId,
+        sentAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    if (msg.type === 'discussion_query') {
+      const query = String(msg.query || '').trim();
+      if (!query) return;
+      const language = String(msg.language || '').trim();
+      if (!room.host || !isSocketOpen(room.host)) {
+        safeSend(ws, { type: 'discussion_error', message: 'Host is offline. Discussion not delivered.' });
+        return;
+      }
+      safeSend(room.host, {
+        type: 'discussion_query',
+        query,
+        language,
         roomId: room.roomId,
         sentAt: new Date().toISOString(),
       });
@@ -278,6 +299,19 @@ function handleAuthedMessage(ws, msg) {
         height: Number(msg.height || 0) || undefined,
         ts: msg.ts || Date.now(),
       });
+      return;
+    }
+
+    if (msg.type === 'discussion_answer' && typeof msg.answer === 'string') {
+      broadcastToControllers(room, { type: 'discussion_answer', answer: msg.answer });
+      return;
+    }
+
+    if (
+      (msg.type === 'discussion_error' || msg.type === 'discussion_answer_error') &&
+      typeof msg.message === 'string'
+    ) {
+      broadcastToControllers(room, { type: msg.type, message: msg.message });
       return;
     }
 

@@ -74,11 +74,94 @@
       .live-ring {
         animation: pulse-ring 1.8s infinite;
       }
+      .arcade-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        aspect-ratio: 1 / 1;
+        width: 5.2rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        box-shadow: inset 0 -8px 14px rgba(2, 6, 23, 0.35);
+      }
+      .arcade-btn:active {
+        transform: scale(0.96);
+      }
+      @media (min-width: 640px) {
+        .arcade-btn {
+          width: 5.8rem;
+        }
+      }
       #agentStateView,
       #logs {
         max-width: 100%;
         overflow-wrap: anywhere;
         word-break: break-word;
+      }
+      .md-content p {
+        margin: 0.2rem 0 0.45rem;
+      }
+      .md-content p:last-child {
+        margin-bottom: 0;
+      }
+      .md-content h1,
+      .md-content h2,
+      .md-content h3 {
+        margin: 0.2rem 0 0.4rem;
+        font-weight: 700;
+      }
+      .md-content h1 {
+        font-size: 0.95rem;
+      }
+      .md-content h2 {
+        font-size: 0.9rem;
+      }
+      .md-content h3 {
+        font-size: 0.85rem;
+      }
+      .md-content ul,
+      .md-content ol {
+        margin: 0.2rem 0 0.45rem 1rem;
+        padding-left: 0.5rem;
+      }
+      .md-content ul {
+        list-style: disc;
+      }
+      .md-content ol {
+        list-style: decimal;
+      }
+      .md-content blockquote {
+        margin: 0.3rem 0;
+        border-left: 2px solid rgba(148, 163, 184, 0.6);
+        padding-left: 0.55rem;
+        color: rgb(203 213 225);
+      }
+      .md-content code {
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.85);
+        border-radius: 0.35rem;
+        padding: 0.05rem 0.32rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+        font-size: 0.92em;
+      }
+      .md-content pre {
+        margin: 0.35rem 0 0.5rem;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 0.5rem;
+        background: rgba(2, 6, 23, 0.9);
+        padding: 0.5rem 0.55rem;
+        overflow-x: auto;
+      }
+      .md-content pre code {
+        border: none;
+        background: transparent;
+        padding: 0;
+      }
+      .md-content a {
+        color: rgb(125 211 252);
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
       @media (max-width: 768px) {
         input,
@@ -97,16 +180,14 @@
             <h1 class="font-display text-4xl leading-none tracking-wide text-emerald-300 sm:text-5xl">ojirapper</h1>
             <p class="mt-1 text-xs text-slate-400 sm:text-sm">Voice + Text Command Pad</p>
           </div>
-          <span id="connectionBadge" class="rounded-full border border-slate-500/60 px-2 py-1 text-xs font-semibold text-slate-300">
-            Disconnected
-          </span>
-        </div>
-
-        <div class="mt-4 rounded-2xl border border-slate-700/70 bg-panelSoft/80 p-3">
-          <p class="text-[11px] uppercase tracking-widest text-slate-400">Agent Status</p>
-          <div class="mt-1 flex items-center gap-2">
-            <span id="statusDot" class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
-            <p id="agentStatus" class="text-lg font-semibold text-slate-100">Idle</p>
+          <div class="flex flex-col items-end gap-2">
+            <span id="connectionBadge" class="rounded-full border border-slate-500/60 px-2 py-1 text-xs font-semibold text-slate-300">
+              Disconnected
+            </span>
+            <div class="inline-flex items-center gap-1 rounded-full border border-slate-600/80 bg-slate-900/70 px-2 py-1 text-[11px]">
+              <span id="statusDot" class="h-2 w-2 rounded-full bg-amber-400"></span>
+              <span id="agentStatus" class="font-semibold text-slate-200">Idle</span>
+            </div>
           </div>
         </div>
 
@@ -116,25 +197,7 @@
             <p id="liveMeta" class="text-xs text-slate-500">No frame yet</p>
           </div>
           <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
-            <img id="liveView" alt="Agent live stream" class="h-auto w-full object-cover" />
-          </div>
-        </section>
-
-        <section class="mt-4 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3 sm:p-4">
-          <p class="mb-2 text-xs uppercase tracking-widest text-slate-400">Agent Control</p>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              id="startAgentBtn"
-              class="rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-3 py-3 text-sm font-bold text-emerald-200 active:scale-[0.98]"
-            >
-              Start Agent
-            </button>
-            <button
-              id="stopAgentBtn"
-              class="rounded-xl border border-rose-400/50 bg-rose-500/20 px-3 py-3 text-sm font-bold text-rose-200 active:scale-[0.98]"
-            >
-              Stop Agent
-            </button>
+            <img id="liveView" alt="Agent live stream" class="h-auto min-h-40 w-full object-cover sm:min-h-48" />
           </div>
         </section>
 
@@ -142,32 +205,93 @@
           <label for="commandInput" class="mb-2 block text-xs uppercase tracking-widest text-slate-400">Command</label>
           <textarea
             id="commandInput"
-            rows="5"
+            rows="1"
             placeholder="말하거나 텍스트로 지시를 입력하세요."
-            class="w-full resize-none rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            class="w-full resize-none overflow-hidden rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
           ></textarea>
-          <div class="mt-3 grid grid-cols-[1fr_auto] gap-2">
-            <button
-              id="sendBtn"
-              class="rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-4 text-base font-bold text-emerald-200 active:scale-[0.98]"
-            >
-              Send
-            </button>
-            <button
-              id="voiceBtn"
-              aria-label="Start voice input"
-              class="h-14 w-14 rounded-full border border-cyan-300/40 bg-cyan-500/20 text-base font-bold text-cyan-100 active:scale-[0.96]"
-              title="Voice Input"
-            >
-              Mic
-            </button>
+          <div class="mt-3 grid gap-3">
+            <div class="flex justify-center gap-3 sm:gap-4">
+              <button
+                id="startAgentBtn"
+                class="arcade-btn border border-slate-200/60 bg-slate-100/20 text-xs text-slate-100"
+              >
+                START
+              </button>
+              <button
+                id="stopAgentBtn"
+                class="arcade-btn border border-rose-400/50 bg-rose-500/25 text-xs text-rose-100"
+              >
+                STOP
+              </button>
+            </div>
+            <div class="flex justify-center gap-3 sm:gap-4">
+              <button
+                id="sendBtn"
+                class="arcade-btn border border-amber-300/50 bg-amber-400/25 text-xs text-amber-100"
+              >
+                SEND
+              </button>
+              <button
+                id="voiceBtn"
+                aria-label="Start voice input"
+                class="arcade-btn border border-cyan-300/40 bg-cyan-500/25 text-xs text-cyan-100"
+                title="Voice Input"
+              >
+                Mic
+              </button>
+            </div>
           </div>
           <p id="voiceHint" class="mt-2 min-h-5 text-xs text-slate-400"></p>
         </section>
 
+        <details id="discussionToggle" class="mt-4 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3 sm:p-4">
+          <summary class="cursor-pointer select-none text-sm font-semibold text-slate-200">Discussion</summary>
+          <div class="mt-3 space-y-3">
+            <p class="text-xs text-slate-400">Ask strategy questions. The server-side LLM will answer using latest agent context.</p>
+            <p id="discussionStatus" class="text-xs text-slate-500">Ready.</p>
+            <div
+              id="discussionChat"
+              class="max-h-56 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/60 p-2 text-xs leading-relaxed"
+            ></div>
+            <textarea
+              id="discussionInput"
+              rows="2"
+              placeholder="Ask for a tactical plan..."
+              class="w-full resize-none rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            ></textarea>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                id="discussionSendBtn"
+                class="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-300 active:scale-[0.98]"
+              >
+                Discuss
+              </button>
+              <button
+                id="discussionUseBtn"
+                class="rounded-lg border border-cyan-300/40 bg-cyan-500/20 px-3 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.98]"
+              >
+                Use Suggestion
+              </button>
+            </div>
+          </div>
+        </details>
+
         <details class="mt-4 rounded-2xl border border-slate-700/70 bg-panel/80 p-3 sm:p-4">
           <summary class="cursor-pointer select-none text-sm font-semibold text-slate-200">Settings</summary>
           <div class="mt-3 space-y-4">
+            <section>
+              <p class="mb-2 text-[11px] uppercase tracking-widest text-slate-400">Discussion Language</p>
+              <select
+                id="discussionLanguage"
+                class="w-full rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              >
+                <option value="ko">Korean (ko)</option>
+                <option value="en">English (en)</option>
+                <option value="ja">Japanese (ja)</option>
+                <option value="zh">Chinese (zh)</option>
+              </select>
+            </section>
+
             <section>
               <p class="mb-2 text-[11px] uppercase tracking-widest text-slate-400">Connection</p>
               <input

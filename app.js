@@ -1,6 +1,7 @@
 (function () {
   const TOKEN_KEY = 'civ_device_token';
   const WS_URL_KEY = 'civ_ws_url';
+  const DISCUSSION_LANG_KEY = 'civ_discussion_lang';
   const state = {
     socket: null,
     reconnectTimer: null,
@@ -12,6 +13,9 @@
     lastFrameAt: 0,
     lastNoFrameWarnAt: 0,
     wsMessageCount: 0,
+    lastSuggestion: '',
+    discussionPending: false,
+    discussionTypingEl: null,
   };
 
   const ui = {
@@ -29,6 +33,13 @@
     sendBtn: document.getElementById('sendBtn'),
     voiceBtn: document.getElementById('voiceBtn'),
     voiceHint: document.getElementById('voiceHint'),
+    discussionToggle: document.getElementById('discussionToggle'),
+    discussionLanguage: document.getElementById('discussionLanguage'),
+    discussionStatus: document.getElementById('discussionStatus'),
+    discussionChat: document.getElementById('discussionChat'),
+    discussionInput: document.getElementById('discussionInput'),
+    discussionSendBtn: document.getElementById('discussionSendBtn'),
+    discussionUseBtn: document.getElementById('discussionUseBtn'),
     agentStateView: document.getElementById('agentStateView'),
     logs: document.getElementById('logs'),
     clearLogsBtn: document.getElementById('clearLogsBtn'),
@@ -45,6 +56,7 @@
     loadSavedConfig();
     bindEvents();
     renderAgentState({});
+    autoResizeCommandInput();
     startDebugMonitors();
     connect();
     log('system', 'Controller initialized');
@@ -75,8 +87,26 @@
         sendCurrentInput();
       }
     });
+    ui.commandInput.addEventListener('input', autoResizeCommandInput);
 
     ui.voiceBtn.addEventListener('click', toggleVoiceInput);
+    ui.discussionSendBtn.addEventListener('click', handleDiscussionSend);
+    ui.discussionUseBtn.addEventListener('click', useLastSuggestion);
+    ui.discussionLanguage.addEventListener('change', () => {
+      localStorage.setItem(DISCUSSION_LANG_KEY, ui.discussionLanguage.value);
+      setDiscussionStatus(`Language set: ${ui.discussionLanguage.value}`);
+    });
+    ui.discussionToggle.addEventListener('toggle', () => {
+      if (ui.discussionToggle.open) {
+        setDiscussionStatus(`Ready to discuss with server LLM (${ui.discussionLanguage.value}).`);
+      }
+    });
+    ui.discussionInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        handleDiscussionSend();
+      }
+    });
     ui.clearLogsBtn.addEventListener('click', () => {
       ui.logs.innerHTML = '';
       log('system', 'Logs cleared');
@@ -101,6 +131,7 @@
       state.qrPairTokenFromUrl = pair.trim();
       log('system', 'QR pair token detected from URL');
     }
+    ui.discussionLanguage.value = localStorage.getItem(DISCUSSION_LANG_KEY) || 'ko';
   }
 
   function validateConfig() {
@@ -258,6 +289,25 @@
       return;
     }
 
+    if (parsed.type === 'discussion_answer') {
+      setDiscussionPending(false);
+      const answer = typeof parsed.answer === 'string' ? parsed.answer : '';
+      if (answer) {
+        state.lastSuggestion = answer;
+        discussionAddMessage('assistant', answer);
+        setDiscussionStatus('LLM response received.');
+      } else {
+        setDiscussionStatus('LLM returned empty response.');
+      }
+      return;
+    }
+
+    if (parsed.type === 'discussion_error' || parsed.type === 'discussion_answer_error') {
+      setDiscussionPending(false);
+      setDiscussionStatus(parsed.message || 'Discussion error');
+      return;
+    }
+
     if (parsed.type === 'video_frame') {
       renderVideoFrame(parsed);
       return;
@@ -291,6 +341,7 @@
     state.socket.send(JSON.stringify({ type: 'command', content: text }));
     log('user', text);
     ui.commandInput.value = '';
+    autoResizeCommandInput();
     setAgentStatus('Waiting for User');
   }
 
@@ -325,6 +376,278 @@
     }
   }
 
+  function handleDiscussionSend() {
+    const text = ui.discussionInput.value.trim();
+    if (!text) return;
+    if (!state.socket || state.socket.readyState !== WebSocket.OPEN || !state.isAuthed) {
+      setDiscussionStatus('Connect first to discuss.');
+      return;
+    }
+    discussionAddMessage('user', text);
+    setDiscussionPending(true);
+    setDiscussionStatus('Asking LLM...');
+    state.socket.send(
+      JSON.stringify({
+        type: 'discussion_query',
+        query: text,
+        language: ui.discussionLanguage.value,
+      }),
+    );
+    ui.discussionInput.value = '';
+  }
+
+  function useLastSuggestion() {
+    if (!state.lastSuggestion) {
+      setDiscussionStatus('No suggestion yet.');
+      return;
+    }
+    ui.commandInput.value = state.lastSuggestion;
+    autoResizeCommandInput();
+    setDiscussionStatus('Suggestion copied to Command.');
+  }
+
+  function discussionAddMessage(role, text) {
+    const row = document.createElement('div');
+    row.className = `mb-2 flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+
+    const bubble = document.createElement('div');
+    bubble.className =
+      role === 'user'
+        ? 'max-w-[88%] rounded-2xl rounded-br-md border border-emerald-300/35 bg-emerald-500/15 px-3 py-2 text-slate-100'
+        : 'max-w-[88%] rounded-2xl rounded-bl-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-slate-100';
+
+    const header = document.createElement('div');
+    header.className = role === 'user' ? 'mb-1 text-[10px] font-semibold text-emerald-300' : 'mb-1 text-[10px] font-semibold text-amber-300';
+    header.textContent = role === 'user' ? 'YOU' : 'ASSISTANT';
+    bubble.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'md-content break-words text-xs leading-relaxed';
+
+    if (role === 'assistant') {
+      const view = buildAssistantView(text);
+      body.innerHTML = renderDiscussionMarkdown(view.shortText);
+      bubble.appendChild(body);
+      if (view.truncated) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'mt-2 rounded-md border border-amber-300/35 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200';
+        moreBtn.textContent = 'More';
+        moreBtn.dataset.expanded = 'false';
+        moreBtn.addEventListener('click', () => {
+          const expanded = moreBtn.dataset.expanded === 'true';
+          if (expanded) {
+            body.innerHTML = renderDiscussionMarkdown(view.shortText);
+            moreBtn.textContent = 'More';
+            moreBtn.dataset.expanded = 'false';
+          } else {
+            body.innerHTML = renderDiscussionMarkdown(view.fullText);
+            moreBtn.textContent = 'Less';
+            moreBtn.dataset.expanded = 'true';
+          }
+        });
+        bubble.appendChild(moreBtn);
+      }
+    } else {
+      body.className = 'whitespace-pre-wrap break-words text-xs leading-relaxed';
+      body.textContent = text;
+      bubble.appendChild(body);
+    }
+
+    row.appendChild(bubble);
+    ui.discussionChat.appendChild(row);
+    ui.discussionChat.scrollTop = ui.discussionChat.scrollHeight;
+  }
+
+  function buildAssistantView(text) {
+    const fullText = normalizeText(text);
+    const lines = fullText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const units =
+      lines.length > 1
+        ? lines
+        : fullText
+            .split(/(?<=[.!?])\s+/)
+            .map((part) => part.trim())
+            .filter(Boolean);
+
+    const shortUnits = units.slice(0, 4).map((line) => shortenLine(line, 120));
+    const shortText = shortUnits.join('\n');
+    const truncated = units.length > 4 || fullText.length > 520;
+
+    return {
+      fullText,
+      shortText: shortText || shortenLine(fullText, 220),
+      truncated,
+    };
+  }
+
+  function normalizeText(text) {
+    return String(text || '')
+      .replace(/\r/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]+/g, ' ')
+      .trim();
+  }
+
+  function shortenLine(line, maxLen) {
+    if (!line || line.length <= maxLen) return line;
+    return `${line.slice(0, maxLen - 3).trimEnd()}...`;
+  }
+
+  function renderDiscussionMarkdown(input) {
+    const text = normalizeText(input);
+    if (!text) return '';
+
+    const codeBlocks = [];
+    let src = text.replace(/```([\s\S]*?)```/g, (_, rawCode) => {
+      const token = `@@CODE_${codeBlocks.length}@@`;
+      codeBlocks.push(rawCode.replace(/^\n+|\n+$/g, ''));
+      return token;
+    });
+
+    const lines = src.split('\n');
+    const out = [];
+    let inUl = false;
+    let inOl = false;
+
+    const closeLists = () => {
+      if (inUl) {
+        out.push('</ul>');
+        inUl = false;
+      }
+      if (inOl) {
+        out.push('</ol>');
+        inOl = false;
+      }
+    };
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) {
+        closeLists();
+        continue;
+      }
+
+      const ul = line.match(/^[-*]\s+(.*)$/);
+      if (ul) {
+        if (inOl) {
+          out.push('</ol>');
+          inOl = false;
+        }
+        if (!inUl) {
+          out.push('<ul>');
+          inUl = true;
+        }
+        out.push(`<li>${renderInlineMarkdown(ul[1])}</li>`);
+        continue;
+      }
+
+      const ol = line.match(/^\d+\.\s+(.*)$/);
+      if (ol) {
+        if (inUl) {
+          out.push('</ul>');
+          inUl = false;
+        }
+        if (!inOl) {
+          out.push('<ol>');
+          inOl = true;
+        }
+        out.push(`<li>${renderInlineMarkdown(ol[1])}</li>`);
+        continue;
+      }
+
+      closeLists();
+
+      const h = line.match(/^(#{1,3})\s+(.*)$/);
+      if (h) {
+        const level = h[1].length;
+        out.push(`<h${level}>${renderInlineMarkdown(h[2])}</h${level}>`);
+        continue;
+      }
+
+      const quote = line.match(/^>\s?(.*)$/);
+      if (quote) {
+        out.push(`<blockquote>${renderInlineMarkdown(quote[1])}</blockquote>`);
+        continue;
+      }
+
+      if (/^@@CODE_\d+@@$/.test(line)) {
+        out.push(`<pre><code>${line}</code></pre>`);
+        continue;
+      }
+
+      out.push(`<p>${renderInlineMarkdown(line)}</p>`);
+    }
+    closeLists();
+
+    let html = out.join('');
+    html = html.replace(/@@CODE_(\d+)@@/g, (_, i) => escapeHtml(codeBlocks[Number(i)] || ''));
+    return html;
+  }
+
+  function renderInlineMarkdown(text) {
+    let html = escapeHtml(text || '');
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, label, url) => {
+      const safe = sanitizeUrl(url);
+      if (!safe) return label;
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    });
+    return html;
+  }
+
+  function sanitizeUrl(url) {
+    try {
+      const value = String(url || '').trim();
+      const parsed = new URL(value);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return escapeHtml(value);
+    } catch {}
+    return '';
+  }
+
+  function setDiscussionPending(pending) {
+    state.discussionPending = pending;
+    ui.discussionSendBtn.disabled = pending;
+    if (pending) {
+      addDiscussionTyping();
+      return;
+    }
+    removeDiscussionTyping();
+  }
+
+  function addDiscussionTyping() {
+    removeDiscussionTyping();
+    const row = document.createElement('div');
+    row.className = 'mb-2 flex justify-start';
+
+    const bubble = document.createElement('div');
+    bubble.className =
+      'max-w-[75%] rounded-2xl rounded-bl-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-slate-200';
+    bubble.textContent = 'Assistant is thinking...';
+
+    row.appendChild(bubble);
+    ui.discussionChat.appendChild(row);
+    state.discussionTypingEl = row;
+    ui.discussionChat.scrollTop = ui.discussionChat.scrollHeight;
+  }
+
+  function removeDiscussionTyping() {
+    if (state.discussionTypingEl && state.discussionTypingEl.parentNode) {
+      state.discussionTypingEl.parentNode.removeChild(state.discussionTypingEl);
+    }
+    state.discussionTypingEl = null;
+  }
+
+  function setDiscussionStatus(text) {
+    ui.discussionStatus.textContent = text;
+  }
+
   function renderVideoFrame(payload) {
     const mime = typeof payload.mime === 'string' ? payload.mime : 'image/jpeg';
     const base64Data = typeof payload.data === 'string' ? payload.data : '';
@@ -344,6 +667,12 @@
 
     const sizeText = payload.width && payload.height ? `${payload.width}x${payload.height}` : '';
     ui.liveMeta.textContent = [fpsText, sizeText, `frames:${state.frameCount}`].filter(Boolean).join(' | ') || 'Streaming';
+  }
+
+  function autoResizeCommandInput() {
+    ui.commandInput.style.height = 'auto';
+    const next = Math.max(56, Math.min(ui.commandInput.scrollHeight, 220));
+    ui.commandInput.style.height = `${next}px`;
   }
 
   function startDebugMonitors() {
@@ -423,6 +752,7 @@
         transcript += event.results[i][0].transcript;
       }
       ui.commandInput.value = transcript.trim();
+      autoResizeCommandInput();
       ui.voiceHint.textContent = 'Voice captured. Review and send.';
     };
 

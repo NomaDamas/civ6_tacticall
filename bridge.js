@@ -73,6 +73,18 @@ const config = {
   localAgentUrl: readArg('local', process.env.LOCAL_AGENT_URL || fileConfig.localAgentUrl || 'ws://localhost:8000/ws'),
   roomId: readArg('room', process.env.ROOM_ID || fileConfig.roomId || 'civ6-room'),
   hostKey: readArg('host-key', process.env.HOST_KEY || fileConfig.hostKey || ''),
+  discussionUserId: readArg(
+    'discussion-user-id',
+    process.env.DISCUSSION_USER_ID || fileConfig.discussionUserId || 'web_user',
+  ),
+  discussionMode: readArg(
+    'discussion-mode',
+    process.env.DISCUSSION_MODE || fileConfig.discussionMode || 'in_game',
+  ),
+  discussionLanguage: readArg(
+    'discussion-language',
+    process.env.DISCUSSION_LANGUAGE || fileConfig.discussionLanguage || 'ko',
+  ),
   controllerBaseUrl: buildAutoControllerBaseUrl(
     relayUrl,
     readArg(
@@ -81,6 +93,12 @@ const config = {
     ),
   ),
 };
+
+const localApiBaseUrl = (function buildLocalApiBaseUrl() {
+  const explicit = String(process.env.LOCAL_API_BASE_URL || fileConfig.localApiBaseUrl || '').trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+  return config.localAgentUrl.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://').replace(/\/ws$/, '');
+})();
 
 if (!config.hostKey) {
   console.error('hostKey is required. Set HOST_KEY, use --host-key, or create host-config.json.');
@@ -91,6 +109,7 @@ let relayWs = null;
 let localWs = null;
 let relayTimer = null;
 let localTimer = null;
+let relayAuthed = false;
 
 function log(kind, msg) {
   const ts = new Date().toISOString();
@@ -102,6 +121,17 @@ function safeSend(ws, payload) {
   ws.send(JSON.stringify(payload));
   return true;
 }
+
+async function fetchJsonWithTimeout(url, options, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 
 function requestPairQr() {
   if (!safeSend(relayWs, { type: 'create_pair_qr', baseUrl: config.controllerBaseUrl })) return;
@@ -151,6 +181,7 @@ function connectRelay() {
 
     if (msg.type === 'auth_ok') {
       log('relay', `authenticated to room '${config.roomId}'`);
+      relayAuthed = true;
       safeSend(relayWs, { type: 'status', status: 'Idle' });
       requestPairQr();
       return;
@@ -188,6 +219,60 @@ function connectRelay() {
       return;
     }
 
+    if (msg.type === 'discussion_query') {
+      try {
+        const query = String(msg.query || '').trim();
+        const language = String(msg.language || config.discussionLanguage || 'ko').trim() || 'ko';
+        if (!query) {
+          safeSend(relayWs, { type: 'discussion_error', message: 'Empty discussion question.' });
+          return;
+        }
+        const endpoint = `${localApiBaseUrl}/api/discuss`;
+        log(
+          'discussion',
+          `query -> ${endpoint} (user_id=${config.discussionUserId}, mode=${config.discussionMode}, language=${language})`,
+        );
+
+        const res = await fetchJsonWithTimeout(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: config.discussionUserId,
+            message: query,
+            mode: config.discussionMode,
+            language,
+          }),
+        });
+        if (!res.ok) {
+          let detail = '';
+          try {
+            const errBody = await res.json();
+            if (errBody && typeof errBody.error === 'string') detail = ` (${errBody.error})`;
+          } catch {}
+          safeSend(relayWs, {
+            type: 'discussion_error',
+            message: `Discussion endpoint failed: ${res.status}${detail}`,
+          });
+          return;
+        }
+        const data = await res.json();
+        const answer = typeof data.response === 'string' ? data.response : '';
+        if (!answer) {
+          safeSend(relayWs, {
+            type: 'discussion_answer_error',
+            message: 'Discussion endpoint returned empty response.',
+          });
+          return;
+        }
+        log('discussion', `answer received (${answer.length} chars)`);
+        safeSend(relayWs, { type: 'discussion_answer', answer });
+      } catch (error) {
+        const reason = error?.name === 'AbortError' ? 'Discussion request timeout (30s)' : `Discussion error: ${error.message}`;
+        safeSend(relayWs, { type: 'discussion_answer_error', message: reason });
+      }
+      return;
+    }
+
     if (msg.type === 'message' && typeof msg.message === 'string') {
       log('relay', msg.message);
     }
@@ -195,6 +280,7 @@ function connectRelay() {
 
   relayWs.on('close', (code) => {
     log('relay', `closed (${code})`);
+    relayAuthed = false;
     relayWs = null;
     if (!relayTimer) {
       relayTimer = setTimeout(() => {

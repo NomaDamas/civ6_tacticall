@@ -3,25 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>ojirapper</title>
+    <title>civ tacticall controller</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              display: ['"Bebas Neue"', 'ui-sans-serif', 'system-ui'],
-              body: ['"Space Grotesk"', 'ui-sans-serif', 'system-ui'],
-            },
-            colors: {
-              panel: '#111827',
-              panelSoft: '#1f2937',
-              accent: '#22c55e',
-              danger: '#ef4444',
-              warning: '#f59e0b',
-            },
-            boxShadow: {
-              glow: '0 0 0 1px rgba(34,197,94,.35), 0 14px 36px rgba(34,197,94,.2)',
+              display: ['"Press Start 2P"', '"Noto Sans KR"', 'ui-sans-serif', 'system-ui'],
+              body: ['"Oxanium"', '"Noto Sans KR"', 'ui-sans-serif', 'system-ui'],
             },
           },
         },
@@ -30,140 +20,892 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&amp;family=Oxanium:wght@400;500;600;700&amp;family=Press+Start+2P&amp;display=swap"
       rel="stylesheet"
     />
+    <link href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" rel="stylesheet" />
     <style>
       :root {
         color-scheme: dark;
+        --bg-top: #12141a;
+        --bg-bottom: #050608;
+        --shell-top: #ddd5c8;
+        --shell-bottom: #b2a996;
+        --shell-rim: #8f8678;
+        --module-top: #2b3038;
+        --module-bottom: #171b21;
+        --module-border: rgba(255, 255, 255, 0.08);
+        --screen-rim: #171a1f;
+        --screen-glow: rgba(187, 247, 208, 0.12);
+        --send-top: #ffd071;
+        --send-bottom: #c68124;
+        --mic-top: #ff8d85;
+        --mic-bottom: #a43d36;
+        --secondary-top: #7f8796;
+        --secondary-bottom: #515967;
+        --text-dark: #17181b;
+        --text-light: #eef2f7;
+        --muted-light: #aab5c4;
       }
+
+      * {
+        box-sizing: border-box;
+      }
+
       html,
       body {
         width: 100%;
+        min-height: 100%;
         overflow-x: hidden;
       }
+
       body {
         min-height: 100svh;
+        margin: 0;
         background:
-          radial-gradient(1100px 560px at 0% -20%, rgba(34, 197, 94, 0.22), transparent 60%),
-          radial-gradient(980px 560px at 100% -15%, rgba(16, 185, 129, 0.14), transparent 60%),
-          linear-gradient(180deg, #020617 0%, #0b1220 60%, #020617 100%);
+          radial-gradient(circle at top, rgba(255, 209, 102, 0.12), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(248, 113, 113, 0.1), transparent 20%),
+          linear-gradient(180deg, var(--bg-top) 0%, #0c0e12 55%, var(--bg-bottom) 100%);
       }
-      .scanlines::before {
+
+      @keyframes record-glow {
+        0% {
+          box-shadow:
+            0 18px 30px rgba(0, 0, 0, 0.28),
+            inset 0 -14px 18px rgba(0, 0, 0, 0.28),
+            inset 0 2px 0 rgba(255, 255, 255, 0.18),
+            0 0 0 0 rgba(255, 141, 133, 0.38);
+        }
+        70% {
+          box-shadow:
+            0 18px 30px rgba(0, 0, 0, 0.28),
+            inset 0 -14px 18px rgba(0, 0, 0, 0.28),
+            inset 0 2px 0 rgba(255, 255, 255, 0.18),
+            0 0 0 18px rgba(255, 141, 133, 0);
+        }
+        100% {
+          box-shadow:
+            0 18px 30px rgba(0, 0, 0, 0.28),
+            inset 0 -14px 18px rgba(0, 0, 0, 0.28),
+            inset 0 2px 0 rgba(255, 255, 255, 0.18),
+            0 0 0 0 rgba(255, 141, 133, 0);
+        }
+      }
+
+      .live-ring {
+        animation: record-glow 1.35s infinite;
+      }
+
+      .app-shell {
+        width: min(100%, 1280px);
+        margin: 0 auto;
+        padding: clamp(16px, 2vw, 28px);
+      }
+
+      .console-shell {
+        position: relative;
+        overflow: hidden;
+        border-radius: 54px;
+        padding: clamp(18px, 2vw, 28px);
+        background:
+          radial-gradient(circle at top, rgba(255, 255, 255, 0.52), transparent 34%),
+          linear-gradient(180deg, var(--shell-top) 0%, #cbc2b3 32%, var(--shell-bottom) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        box-shadow:
+          inset 0 2px 0 rgba(255, 255, 255, 0.75),
+          inset 0 -12px 18px rgba(70, 58, 39, 0.12),
+          0 28px 60px rgba(0, 0, 0, 0.46);
+      }
+
+      .console-shell::before,
+      .console-shell::after {
+        content: '';
+        position: absolute;
+        top: 14%;
+        bottom: 14%;
+        width: 148px;
+        border-radius: 9999px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(120, 111, 94, 0.18));
+        opacity: 0.8;
+      }
+
+      .console-shell::before {
+        left: -82px;
+      }
+
+      .console-shell::after {
+        right: -82px;
+      }
+
+      .console-shell > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .hud {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 18px;
+      }
+
+      .micro-title {
+        margin: 0;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.6rem;
+        letter-spacing: 0.14em;
+        color: rgba(23, 24, 27, 0.72);
+      }
+
+      .brand-wordmark {
+        margin: 14px 0 0;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: clamp(1.4rem, 2.3vw, 2.15rem);
+        line-height: 1.28;
+        color: var(--text-dark);
+      }
+
+      .brand-copy {
+        margin: 14px 0 0;
+        max-width: 36rem;
+        color: rgba(23, 24, 27, 0.76);
+        font-size: 0.98rem;
+        line-height: 1.62;
+      }
+
+      .hud-right {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      .hud-chip {
+        background: rgba(19, 23, 29, 0.94);
+        color: var(--text-light);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 10px 18px rgba(0, 0, 0, 0.16);
+      }
+
+      .status-readout {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 9999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(19, 23, 29, 0.94);
+        padding: 0.68rem 0.94rem;
+        color: var(--text-light);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 10px 18px rgba(0, 0, 0, 0.16);
+      }
+
+      .status-label {
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.52rem;
+        letter-spacing: 0.08em;
+        color: #d7c18e;
+      }
+
+      .controller-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 22px;
+        margin-top: 24px;
+      }
+
+      .action-column {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .support-card,
+      .display-card,
+      .command-card,
+      .module-card {
+        border-radius: 30px;
+        background: linear-gradient(180deg, var(--module-top) 0%, var(--module-bottom) 100%);
+        border: 1px solid var(--module-border);
+        color: var(--text-light);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 16px 28px rgba(0, 0, 0, 0.22);
+      }
+
+      .support-card,
+      .display-card,
+      .command-card {
+        padding: 18px;
+      }
+
+      .core-column {
+        display: grid;
+        gap: 18px;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .panel-tag {
+        margin: 0;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.56rem;
+        letter-spacing: 0.08em;
+        color: #f7d38a;
+      }
+
+      .panel-copy {
+        margin: 10px 0 0;
+        color: var(--muted-light);
+        font-size: 0.95rem;
+        line-height: 1.58;
+      }
+
+      .frame-readout {
+        color: #b8c4d6;
+        font-size: 0.94rem;
+      }
+
+      .screen-stage {
+        position: relative;
+        margin-top: 14px;
+        min-height: 292px;
+        overflow: hidden;
+        border-radius: 24px;
+        border: 12px solid var(--screen-rim);
+        background:
+          radial-gradient(circle at center, var(--screen-glow), transparent 48%),
+          linear-gradient(180deg, #0a0d10 0%, #050608 100%);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+          inset 0 0 60px rgba(129, 237, 171, 0.06),
+          0 18px 30px rgba(0, 0, 0, 0.26);
+      }
+
+      .screen-stage::before {
         content: '';
         position: absolute;
         inset: 0;
         pointer-events: none;
         background: repeating-linear-gradient(
           to bottom,
-          rgba(255, 255, 255, 0.022),
-          rgba(255, 255, 255, 0.022) 1px,
-          transparent 1px,
-          transparent 3px
+          rgba(255, 255, 255, 0.03),
+          rgba(255, 255, 255, 0.03) 2px,
+          transparent 2px,
+          transparent 5px
         );
-        mix-blend-mode: soft-light;
+        mix-blend-mode: screen;
       }
-      @keyframes pulse-ring {
-        0% {
-          box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
-        }
-        100% {
-          box-shadow: 0 0 0 16px rgba(34, 197, 94, 0);
-        }
+
+      .screen-overlay {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        right: 14px;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.48rem;
+        color: rgba(200, 255, 203, 0.78);
       }
-      .live-ring {
-        animation: pulse-ring 1.8s infinite;
+
+      .screen-image {
+        display: block;
+        width: 100%;
+        min-height: 292px;
+        height: 100%;
+        object-fit: cover;
       }
-      .arcade-btn {
+
+      .command-input,
+      .module-textarea,
+      .module-input,
+      .module-select {
+        width: 100%;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(8, 10, 13, 0.74);
+        color: #f8fbff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      }
+
+      .command-input {
+        min-height: 118px;
+        margin-top: 14px;
+        padding: 18px;
+        resize: none;
+        font-size: 1rem;
+        line-height: 1.68;
+      }
+
+      .module-textarea,
+      .module-input,
+      .module-select {
+        margin-top: 12px;
+        padding: 12px 14px;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+
+      .command-input:focus,
+      .module-textarea:focus,
+      .module-input:focus,
+      .module-select:focus {
+        outline: none;
+        border-color: rgba(255, 208, 113, 0.48);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.02),
+          0 0 0 4px rgba(255, 208, 113, 0.12);
+      }
+
+      .voice-strip {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        margin-top: 14px;
+        padding: 13px 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(8, 10, 13, 0.56);
+      }
+
+      .voice-badge {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        min-width: 92px;
+        padding: 0.46rem 0.7rem;
         border-radius: 9999px;
-        aspect-ratio: 1 / 1;
-        width: 5.2rem;
+        border: 1px solid rgba(255, 208, 113, 0.34);
+        background: rgba(255, 208, 113, 0.09);
+        color: #f6d791;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.46rem;
+        letter-spacing: 0.08em;
+      }
+
+      .voice-hint {
+        margin: 0;
+        color: #d7dfeb;
+        font-size: 0.95rem;
+        line-height: 1.58;
+      }
+
+      .primary-stack {
+        padding: 18px;
+        border-radius: 32px;
+        background: linear-gradient(180deg, rgba(35, 40, 47, 0.96) 0%, rgba(16, 19, 24, 0.98) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 16px 28px rgba(0, 0, 0, 0.22);
+      }
+
+      .action-title {
+        margin: 0;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+        color: rgba(23, 24, 27, 0.72);
+      }
+
+      .action-copy {
+        margin: 12px 0 0;
+        color: rgba(23, 24, 27, 0.74);
+        font-size: 0.92rem;
+        line-height: 1.58;
+      }
+
+      .primary-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .face-btn {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 118px;
+        border: none;
+        border-radius: 9999px;
+        color: #fffdf8;
+        box-shadow:
+          0 18px 30px rgba(0, 0, 0, 0.28),
+          inset 0 -14px 18px rgba(0, 0, 0, 0.28),
+          inset 0 2px 0 rgba(255, 255, 255, 0.18);
+      }
+
+      .face-btn-letter {
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 1.04rem;
+        line-height: 1;
+      }
+
+      .face-btn-label {
+        margin-top: 10px;
+        font-size: 0.74rem;
         font-weight: 700;
-        letter-spacing: 0.02em;
-        box-shadow: inset 0 -8px 14px rgba(2, 6, 23, 0.35);
+        letter-spacing: 0.08em;
       }
-      .arcade-btn:active {
-        transform: scale(0.96);
+
+      .face-btn-a {
+        background: radial-gradient(circle at 32% 28%, var(--send-top) 0%, #f2b64b 48%, var(--send-bottom) 100%);
       }
-      @media (min-width: 640px) {
-        .arcade-btn {
-          width: 5.8rem;
-        }
+
+      .face-btn-b {
+        background: radial-gradient(circle at 32% 28%, var(--mic-top) 0%, #dd6258 48%, var(--mic-bottom) 100%);
       }
+
+      .face-btn.is-recording {
+        background: radial-gradient(circle at 32% 28%, #ffbbb4 0%, #f56b62 48%, #8e2d28 100%);
+      }
+
+      .secondary-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .secondary-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 62px;
+        border: none;
+        border-radius: 18px;
+        color: #f6f8fb;
+        background: linear-gradient(180deg, var(--secondary-top) 0%, var(--secondary-bottom) 100%);
+        box-shadow:
+          0 12px 20px rgba(0, 0, 0, 0.18),
+          inset 0 1px 0 rgba(255, 255, 255, 0.14),
+          inset 0 -8px 12px rgba(0, 0, 0, 0.22);
+      }
+
+      .secondary-btn.start-btn {
+        background: linear-gradient(180deg, #8dcf68 0%, #4f7c3f 100%);
+      }
+
+      .secondary-btn.stop-btn {
+        background: linear-gradient(180deg, #de7a72 0%, #8b3935 100%);
+      }
+
+      .secondary-letter {
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.7rem;
+      }
+
+      .secondary-label {
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+
+      .pressable-btn {
+        transition:
+          transform 130ms ease,
+          filter 130ms ease,
+          box-shadow 130ms ease;
+      }
+
+      .pressable-btn:active {
+        transform: translateY(2px) scale(0.98);
+        filter: brightness(0.84);
+      }
+
+      .legend-card {
+        border-radius: 22px;
+        border: 1px dashed rgba(255, 255, 255, 0.16);
+        background: rgba(21, 23, 28, 0.62);
+        padding: 14px 16px;
+        color: var(--muted-light);
+        font-size: 0.9rem;
+        line-height: 1.64;
+      }
+
+      .legend-card p {
+        margin: 0;
+      }
+
+      .legend-card p + p {
+        margin-top: 8px;
+      }
+
+      .utility-row,
+      .module-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .utility-btn {
+        min-height: 54px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        background: linear-gradient(180deg, #404754 0%, #232933 100%);
+        color: #f4f7fb;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          0 10px 18px rgba(0, 0, 0, 0.16);
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.62rem;
+        letter-spacing: 0.06em;
+      }
+
+      .utility-btn.is-accent {
+        background: linear-gradient(180deg, #7d8654 0%, #4a512d 100%);
+      }
+
+      .utility-btn.is-warm {
+        background: linear-gradient(180deg, #8a6b4b 0%, #5a442d 100%);
+      }
+
+      .tv-btn {
+        width: 100%;
+        margin-top: 12px;
+      }
+
+      .guide-card {
+        margin-top: 18px;
+      }
+
+      .drawer-dock {
+        position: fixed;
+        top: 104px;
+        right: 14px;
+        z-index: 40;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .drawer-tab {
+        min-width: 74px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        background: linear-gradient(180deg, #464d59 0%, #232932 100%);
+        color: #f4f7fb;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          0 10px 18px rgba(0, 0, 0, 0.16);
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.56rem;
+        letter-spacing: 0.06em;
+        padding: 1rem 0.85rem;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+      }
+
+      .drawer-tab.is-active {
+        background: linear-gradient(180deg, #9f8159 0%, #5d442f 100%);
+      }
+
+      .drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 45;
+        background: rgba(5, 6, 8, 0.48);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 180ms ease;
+      }
+
+      .drawer-backdrop.is-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .side-drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 50;
+        width: min(420px, calc(100vw - 20px));
+        height: 100svh;
+        padding: 18px;
+        background: linear-gradient(180deg, #2a3038 0%, #151920 100%);
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: -22px 0 40px rgba(0, 0, 0, 0.28);
+        transform: translateX(104%);
+        transition: transform 220ms ease;
+        overflow-y: auto;
+      }
+
+      .side-drawer.is-open {
+        transform: translateX(0);
+      }
+
+      .drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .drawer-title {
+        margin: 0;
+        color: #f3d28a;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+      }
+
+      .drawer-close {
+        min-width: 54px;
+        min-height: 42px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #5b4651 0%, #36212a 100%);
+        color: #fff2f4;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          0 10px 18px rgba(0, 0, 0, 0.16);
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.56rem;
+      }
+
+      .drawer-body {
+        border-radius: 24px;
+        background: rgba(8, 10, 13, 0.48);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 18px;
+      }
+
+      .module-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+        gap: 18px;
+        margin-top: 24px;
+      }
+
+      .module-card {
+        overflow: hidden;
+      }
+
+      .module-card summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        cursor: pointer;
+        list-style: none;
+        padding: 18px 20px;
+        color: #f3d28a;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+      }
+
+      .module-card summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .module-card summary::after {
+        content: '+';
+        color: #f6d791;
+        font-size: 0.94rem;
+      }
+
+      .module-card[open] summary::after {
+        content: '-';
+      }
+
+      .module-body {
+        padding: 0 20px 20px;
+      }
+
+      .module-copy {
+        margin: 0;
+        color: var(--muted-light);
+        font-size: 0.94rem;
+        line-height: 1.6;
+      }
+
+      .module-console {
+        margin-top: 12px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(8, 10, 13, 0.58);
+        padding: 12px;
+        font-size: 0.84rem;
+        line-height: 1.6;
+      }
+
+      .module-label {
+        margin: 0;
+        font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
+        font-size: 0.52rem;
+        letter-spacing: 0.08em;
+        color: #d5b977;
+      }
+
+      .module-section + .module-section {
+        margin-top: 18px;
+      }
+
+      .log-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .module-link {
+        background: none;
+        border: none;
+        padding: 0;
+        color: #d7dfeb;
+        font-size: 0.82rem;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
+      #discussionChat,
       #agentStateView,
       #logs {
         max-width: 100%;
         overflow-wrap: anywhere;
         word-break: break-word;
       }
-      .md-content p {
-        margin: 0.2rem 0 0.45rem;
+
+      #discussionChat,
+      #logs {
+        max-height: 250px;
+        overflow-y: auto;
       }
+
+      .md-content p {
+        margin: 0.25rem 0 0.5rem;
+      }
+
       .md-content p:last-child {
         margin-bottom: 0;
       }
+
       .md-content h1,
       .md-content h2,
       .md-content h3 {
         margin: 0.2rem 0 0.4rem;
         font-weight: 700;
       }
+
       .md-content h1 {
         font-size: 0.95rem;
       }
+
       .md-content h2 {
         font-size: 0.9rem;
       }
+
       .md-content h3 {
         font-size: 0.85rem;
       }
+
       .md-content ul,
       .md-content ol {
         margin: 0.2rem 0 0.45rem 1rem;
         padding-left: 0.5rem;
       }
+
       .md-content ul {
         list-style: disc;
       }
+
       .md-content ol {
         list-style: decimal;
       }
+
       .md-content blockquote {
         margin: 0.3rem 0;
-        border-left: 2px solid rgba(148, 163, 184, 0.6);
+        border-left: 2px solid rgba(255, 255, 255, 0.24);
         padding-left: 0.55rem;
-        color: rgb(203 213 225);
+        color: #d6deeb;
       }
+
       .md-content code {
-        border: 1px solid rgba(148, 163, 184, 0.4);
-        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(8, 10, 13, 0.84);
         border-radius: 0.35rem;
         padding: 0.05rem 0.32rem;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
         font-size: 0.92em;
       }
+
       .md-content pre {
         margin: 0.35rem 0 0.5rem;
-        border: 1px solid rgba(148, 163, 184, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 0.5rem;
-        background: rgba(2, 6, 23, 0.9);
+        background: rgba(8, 10, 13, 0.92);
         padding: 0.5rem 0.55rem;
         overflow-x: auto;
       }
+
       .md-content pre code {
         border: none;
         background: transparent;
         padding: 0;
       }
+
       .md-content a {
-        color: rgb(125 211 252);
+        color: #f6d791;
         text-decoration: underline;
         text-underline-offset: 2px;
       }
+
+      @media (max-width: 1080px) {
+        .console-shell::before,
+        .console-shell::after {
+          display: none;
+        }
+      }
+
       @media (max-width: 768px) {
+        .hud {
+          flex-direction: column;
+        }
+
+        .hud-right {
+          justify-content: flex-start;
+        }
+
+        .primary-actions,
+        .secondary-actions,
+        .utility-row,
+        .module-actions {
+          grid-template-columns: 1fr;
+        }
+
+        .screen-stage,
+        .screen-image {
+          min-height: 220px;
+        }
+
+        .voice-strip {
+          flex-direction: column;
+        }
+
+        .side-drawer {
+          width: min(100vw, 420px);
+        }
+      }
+
+      @media (max-width: 640px) {
         input,
         textarea,
         select {
@@ -172,174 +914,191 @@
       }
     </style>
   </head>
-  <body class="font-body text-slate-100 antialiased">
-    <main class="relative mx-auto min-h-svh w-full max-w-3xl overflow-x-hidden p-3 pb-6 sm:p-5 scanlines">
-      <section class="rounded-3xl border border-emerald-400/30 bg-panel/85 p-4 shadow-glow backdrop-blur sm:p-5">
-        <div class="flex items-start justify-between gap-3">
+  <body class="font-body antialiased">
+    <main class="app-shell">
+      <section class="console-shell">
+        <header class="hud">
           <div>
-            <h1 class="font-display text-4xl leading-none tracking-wide text-emerald-300 sm:text-5xl">ojirapper</h1>
-            <p class="mt-1 text-xs text-slate-400 sm:text-sm">Voice + Text Command Pad</p>
+            <p class="micro-title">TACTICAL REMOTE DECK</p>
+            <h1 class="brand-wordmark">civ tacticall controller</h1>
           </div>
-          <div class="flex flex-col items-end gap-2">
-            <span id="connectionBadge" class="rounded-full border border-slate-500/60 px-2 py-1 text-xs font-semibold text-slate-300">
+          <div class="hud-right">
+            <span
+              id="connectionBadge"
+              class="hud-chip rounded-full border border-slate-500/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-200"
+            >
               Disconnected
             </span>
-            <div class="inline-flex items-center gap-1 rounded-full border border-slate-600/80 bg-slate-900/70 px-2 py-1 text-[11px]">
-              <span id="statusDot" class="h-2 w-2 rounded-full bg-amber-400"></span>
-              <span id="agentStatus" class="font-semibold text-slate-200">Idle</span>
+            <div class="status-readout">
+              <span class="status-label">AGENT</span>
+              <span id="statusDot" class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+              <span id="agentStatus" class="font-semibold text-slate-100">Idle</span>
             </div>
           </div>
+        </header>
+
+        <div class="controller-grid">
+          <section class="core-column">
+            <section class="command-card">
+              <div class="panel-head">
+                <p class="panel-tag">COMMAND BUFFER</p>
+                <span class="voice-badge">REALTIME</span>
+              </div>
+              <textarea
+                id="commandInput"
+                rows="1"
+                placeholder="말하거나 텍스트로 지시를 입력하세요."
+                class="command-input"
+              ></textarea>
+              <div class="voice-strip">
+                <span class="voice-badge">B / MIC</span>
+                <p id="voiceHint" class="voice-hint">마이크 꺼짐. B 버튼을 누르면 실시간 입력이 시작되고, 말이 멈추면 자동 종료됩니다.</p>
+              </div>
+            </section>
+
+            <section id="liveSection" class="display-card" hidden>
+              <div class="panel-head">
+                <p class="panel-tag">LIVE FEED</p>
+                <p id="liveMeta" class="frame-readout">No frame yet</p>
+              </div>
+              <div class="screen-stage">
+                <div class="screen-overlay">
+                  <span>CAM-01</span>
+                  <span>TACTICALL LINK</span>
+                </div>
+                <img id="liveView" alt="Agent live stream" class="screen-image" />
+              </div>
+            </section>
+          </section>
+
+          <aside class="action-column">
+            <section class="primary-stack">
+              <p class="action-title">ACTION PAD</p>
+
+              <div class="primary-actions">
+                <button
+                  id="voiceBtn"
+                  aria-label="실시간 음성 입력 시작"
+                  class="face-btn face-btn-b pressable-btn"
+                  title="실시간 음성 입력 시작"
+                >
+                  <span class="face-btn-letter">B</span>
+                  <span id="voiceBtnLabel" class="face-btn-label">MIC</span>
+                </button>
+                <button id="sendBtn" class="face-btn face-btn-a pressable-btn" aria-label="명령 전송" title="명령 전송">
+                  <span class="face-btn-letter">A</span>
+                  <span class="face-btn-label">SEND</span>
+                </button>
+              </div>
+
+              <div class="secondary-actions">
+                <button id="startAgentBtn" class="secondary-btn start-btn pressable-btn" aria-label="에이전트 시작" title="에이전트 시작">
+                  <span class="secondary-letter">X</span>
+                  <span class="secondary-label">START</span>
+                </button>
+                <button id="stopAgentBtn" class="secondary-btn stop-btn pressable-btn" aria-label="에이전트 중지" title="에이전트 중지">
+                  <span class="secondary-letter">Y</span>
+                  <span class="secondary-label">STOP</span>
+                </button>
+              </div>
+
+              <button id="tvToggleBtn" class="utility-btn is-warm tv-btn pressable-btn" aria-pressed="false">TV ON</button>
+            </section>
+          </aside>
         </div>
 
-        <section class="mt-4 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3 sm:p-4">
-          <div class="mb-2 flex items-center justify-between">
-            <p class="text-xs uppercase tracking-widest text-slate-400">Live View</p>
-            <p id="liveMeta" class="text-xs text-slate-500">No frame yet</p>
-          </div>
-          <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
-            <img id="liveView" alt="Agent live stream" class="h-auto min-h-40 w-full object-cover sm:min-h-48" />
-          </div>
-        </section>
-
-        <section class="mt-4 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3 sm:p-4">
-          <label for="commandInput" class="mb-2 block text-xs uppercase tracking-widest text-slate-400">Command</label>
-          <textarea
-            id="commandInput"
-            rows="1"
-            placeholder="말하거나 텍스트로 지시를 입력하세요."
-            class="w-full resize-none overflow-hidden rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-          ></textarea>
-          <div class="mt-3 grid gap-3">
-            <div class="flex justify-center gap-3 sm:gap-4">
-              <button
-                id="startAgentBtn"
-                class="arcade-btn border border-slate-200/60 bg-slate-100/20 text-xs text-slate-100"
-              >
-                START
-              </button>
-              <button
-                id="stopAgentBtn"
-                class="arcade-btn border border-rose-400/50 bg-rose-500/25 text-xs text-rose-100"
-              >
-                STOP
-              </button>
-            </div>
-            <div class="flex justify-center gap-3 sm:gap-4">
-              <button
-                id="sendBtn"
-                class="arcade-btn border border-amber-300/50 bg-amber-400/25 text-xs text-amber-100"
-              >
-                SEND
-              </button>
-              <button
-                id="voiceBtn"
-                aria-label="Start voice input"
-                class="arcade-btn border border-cyan-300/40 bg-cyan-500/25 text-xs text-cyan-100"
-                title="Voice Input"
-              >
-                Mic
-              </button>
-            </div>
-          </div>
-          <p id="voiceHint" class="mt-2 min-h-5 text-xs text-slate-400"></p>
-        </section>
-
-        <details id="discussionToggle" class="mt-4 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3 sm:p-4">
-          <summary class="cursor-pointer select-none text-sm font-semibold text-slate-200">Discussion</summary>
-          <div class="mt-3 space-y-3">
-            <p class="text-xs text-slate-400">Ask strategy questions. The server-side LLM will answer using latest agent context.</p>
-            <p id="discussionStatus" class="text-xs text-slate-500">Ready.</p>
-            <div
-              id="discussionChat"
-              class="max-h-56 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/60 p-2 text-xs leading-relaxed"
-            ></div>
-            <textarea
-              id="discussionInput"
-              rows="2"
-              placeholder="Ask for a tactical plan..."
-              class="w-full resize-none rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-            ></textarea>
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                id="discussionSendBtn"
-                class="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-300 active:scale-[0.98]"
-              >
-                Discuss
-              </button>
-              <button
-                id="discussionUseBtn"
-                class="rounded-lg border border-cyan-300/40 bg-cyan-500/20 px-3 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.98]"
-              >
-                Use Suggestion
-              </button>
-            </div>
-          </div>
-        </details>
-
-        <details class="mt-4 rounded-2xl border border-slate-700/70 bg-panel/80 p-3 sm:p-4">
-          <summary class="cursor-pointer select-none text-sm font-semibold text-slate-200">Settings</summary>
-          <div class="mt-3 space-y-4">
-            <section>
-              <p class="mb-2 text-[11px] uppercase tracking-widest text-slate-400">Discussion Language</p>
-              <select
-                id="discussionLanguage"
-                class="w-full rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-              >
-                <option value="ko">Korean (ko)</option>
-                <option value="en">English (en)</option>
-                <option value="ja">Japanese (ja)</option>
-                <option value="zh">Chinese (zh)</option>
-              </select>
-            </section>
-
-            <section>
-              <p class="mb-2 text-[11px] uppercase tracking-widest text-slate-400">Connection</p>
-              <input
-                id="wsUrl"
-                type="text"
-                inputmode="url"
-                autocomplete="off"
-                class="w-full rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                placeholder="wss://your-relay-domain/ws"
-              />
-              <div class="mt-2 grid grid-cols-2 gap-2">
-                <button
-                  id="connectBtn"
-                  class="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-2.5 text-sm font-semibold text-emerald-300 active:scale-[0.98]"
-                >
-                  Connect
-                </button>
-                <button
-                  id="forgetBtn"
-                  class="rounded-lg border border-slate-500/40 bg-slate-700/30 px-3 py-2.5 text-sm font-semibold text-slate-200 active:scale-[0.98]"
-                >
-                  Forget Login
-                </button>
-              </div>
-            </section>
-
-            <section>
-              <p class="text-[11px] uppercase tracking-widest text-slate-400">Agent State Snapshot</p>
-              <pre
-                id="agentStateView"
-                class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-slate-700 bg-slate-950/70 p-2 font-mono text-[11px] leading-relaxed text-slate-300"
-              >{}</pre>
-            </section>
-
-            <section>
-              <div class="mb-2 flex items-center justify-between">
-                <p class="text-[11px] uppercase tracking-widest text-slate-400">Action Logs</p>
-                <button id="clearLogsBtn" class="text-xs text-slate-400 underline underline-offset-2">Clear</button>
-              </div>
-              <div
-                id="logs"
-                class="max-h-52 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/60 p-2 font-mono text-xs leading-relaxed"
-              ></div>
-            </section>
-          </div>
-        </details>
       </section>
     </main>
+
+    <div id="drawerDock" class="drawer-dock">
+      <button id="guideDrawerBtn" class="drawer-tab pressable-btn" aria-pressed="false">GUIDE</button>
+      <button id="discussionDrawerBtn" class="drawer-tab pressable-btn" aria-pressed="false">DISCUSS</button>
+      <button id="systemDrawerBtn" class="drawer-tab pressable-btn" aria-pressed="false">SYSTEM</button>
+    </div>
+
+    <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
+    <aside id="guideDrawer" class="side-drawer">
+      <div class="drawer-head">
+        <h2 class="drawer-title">USER GUIDE</h2>
+        <button type="button" class="drawer-close pressable-btn" data-drawer-close>EXIT</button>
+      </div>
+      <div class="drawer-body">
+        <p class="module-copy">이 저장소는 클라이언트 데크이고, 서버 런타임은 civStation 쪽에 둔 전제로 정리했습니다.</p>
+        <p class="module-copy" style="margin-top: 12px;"><strong>A</strong>는 현재 명령 전송, <strong>B</strong>는 실시간 마이크 시작, <strong>X/Y</strong>는 에이전트 시작과 중지입니다.</p>
+        <p class="module-copy" style="margin-top: 12px;">스트리밍 화면은 기본 숨김이며, 필요할 때만 TV ON 버튼으로 열 수 있습니다.</p>
+        <p class="module-copy" style="margin-top: 12px;">마이크는 명령형 입력에 맞춰 짧은 침묵이 감지되면 자동 종료되도록 두었습니다.</p>
+      </div>
+    </aside>
+
+    <aside id="discussionDrawer" class="side-drawer">
+      <div class="drawer-head">
+        <h2 class="drawer-title">DISCUSSION BAY</h2>
+        <button type="button" class="drawer-close pressable-btn" data-drawer-close>EXIT</button>
+      </div>
+      <div class="drawer-body">
+        <p class="module-copy">에이전트의 최신 문맥을 기준으로 전략이나 다음 행동을 물어볼 수 있습니다.</p>
+        <p id="discussionStatus" class="module-copy" style="margin-top: 12px;">Ready.</p>
+        <div id="discussionChat" class="module-console"></div>
+        <textarea
+          id="discussionInput"
+          rows="2"
+          placeholder="전술이나 다음 플랜을 물어보세요."
+          class="module-textarea"
+        ></textarea>
+        <div class="module-actions">
+          <button id="discussionSendBtn" class="utility-btn is-accent pressable-btn">DISCUSS</button>
+          <button id="discussionUseBtn" class="utility-btn is-warm pressable-btn">USE</button>
+        </div>
+      </div>
+    </aside>
+
+    <aside id="systemDrawer" class="side-drawer">
+      <div class="drawer-head">
+        <h2 class="drawer-title">SYSTEM MENU</h2>
+        <button type="button" class="drawer-close pressable-btn" data-drawer-close>EXIT</button>
+      </div>
+      <div class="drawer-body">
+        <section class="module-section">
+          <p class="module-label">DISCUSSION LANGUAGE</p>
+          <select id="discussionLanguage" class="module-select">
+            <option value="ko">Korean (ko)</option>
+            <option value="en">English (en)</option>
+            <option value="ja">Japanese (ja)</option>
+            <option value="zh">Chinese (zh)</option>
+          </select>
+        </section>
+
+        <section class="module-section">
+          <p class="module-label">CONNECTION</p>
+          <input
+            id="wsUrl"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            class="module-input"
+            placeholder="wss://your-civstation-domain/ws"
+          />
+          <div class="utility-row">
+            <button id="connectBtn" class="utility-btn is-accent pressable-btn">CONNECT</button>
+            <button id="forgetBtn" class="utility-btn pressable-btn">FORGET</button>
+          </div>
+        </section>
+
+        <section class="module-section">
+          <p class="module-label">AGENT STATE SNAPSHOT</p>
+          <pre id="agentStateView" class="module-console">{}</pre>
+        </section>
+
+        <section class="module-section">
+          <div class="log-header">
+            <p class="module-label">ACTION LOGS</p>
+            <button id="clearLogsBtn" class="module-link">Clear</button>
+          </div>
+          <div id="logs" class="module-console"></div>
+        </section>
+      </div>
+    </aside>
 
     <script src="./app.js" defer></script>
   </body>

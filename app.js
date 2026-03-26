@@ -16,6 +16,19 @@
     lastSuggestion: '',
     discussionPending: false,
     discussionTypingEl: null,
+    liveViewVisible: false,
+    openDrawer: '',
+    voiceRecognition: null,
+    voiceRequested: false,
+    voiceRestartTimer: null,
+    voiceBaseValue: '',
+    voiceCommittedTranscript: '',
+    voiceFinalTranscript: '',
+    voiceInterimTranscript: '',
+    voiceResultOffset: 0,
+    voiceResultCount: 0,
+    voiceIdleTimer: null,
+    voiceStopReason: 'manual',
   };
 
   const ui = {
@@ -27,13 +40,22 @@
     statusDot: document.getElementById('statusDot'),
     liveView: document.getElementById('liveView'),
     liveMeta: document.getElementById('liveMeta'),
+    liveSection: document.getElementById('liveSection'),
     startAgentBtn: document.getElementById('startAgentBtn'),
     stopAgentBtn: document.getElementById('stopAgentBtn'),
     commandInput: document.getElementById('commandInput'),
     sendBtn: document.getElementById('sendBtn'),
     voiceBtn: document.getElementById('voiceBtn'),
+    voiceBtnLabel: document.getElementById('voiceBtnLabel'),
+    tvToggleBtn: document.getElementById('tvToggleBtn'),
+    guideDrawerBtn: document.getElementById('guideDrawerBtn'),
+    discussionDrawerBtn: document.getElementById('discussionDrawerBtn'),
+    systemDrawerBtn: document.getElementById('systemDrawerBtn'),
+    drawerBackdrop: document.getElementById('drawerBackdrop'),
+    guideDrawer: document.getElementById('guideDrawer'),
+    discussionDrawer: document.getElementById('discussionDrawer'),
+    systemDrawer: document.getElementById('systemDrawer'),
     voiceHint: document.getElementById('voiceHint'),
-    discussionToggle: document.getElementById('discussionToggle'),
     discussionLanguage: document.getElementById('discussionLanguage'),
     discussionStatus: document.getElementById('discussionStatus'),
     discussionChat: document.getElementById('discussionChat'),
@@ -57,6 +79,9 @@
     bindEvents();
     renderAgentState({});
     autoResizeCommandInput();
+    updateVoiceButtonState();
+    setLiveViewVisible(false);
+    setOpenDrawer('');
     startDebugMonitors();
     connect();
     log('system', 'Controller initialized');
@@ -81,13 +106,26 @@
     ui.sendBtn.addEventListener('click', sendCurrentInput);
     ui.startAgentBtn.addEventListener('click', () => sendControl('start'));
     ui.stopAgentBtn.addEventListener('click', () => sendControl('stop'));
+    ui.tvToggleBtn.addEventListener('click', toggleLiveView);
+    ui.guideDrawerBtn.addEventListener('click', () => toggleDrawer('guide'));
+    ui.discussionDrawerBtn.addEventListener('click', () => toggleDrawer('discussion'));
+    ui.systemDrawerBtn.addEventListener('click', () => toggleDrawer('system'));
+    ui.drawerBackdrop.addEventListener('click', () => setOpenDrawer(''));
+    document.querySelectorAll('[data-drawer-close]').forEach((button) => {
+      button.addEventListener('click', () => setOpenDrawer(''));
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && state.openDrawer) {
+        setOpenDrawer('');
+      }
+    });
     ui.commandInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         sendCurrentInput();
       }
     });
-    ui.commandInput.addEventListener('input', autoResizeCommandInput);
+    ui.commandInput.addEventListener('input', handleCommandInput);
 
     ui.voiceBtn.addEventListener('click', toggleVoiceInput);
     ui.discussionSendBtn.addEventListener('click', handleDiscussionSend);
@@ -95,11 +133,6 @@
     ui.discussionLanguage.addEventListener('change', () => {
       localStorage.setItem(DISCUSSION_LANG_KEY, ui.discussionLanguage.value);
       setDiscussionStatus(`Language set: ${ui.discussionLanguage.value}`);
-    });
-    ui.discussionToggle.addEventListener('toggle', () => {
-      if (ui.discussionToggle.open) {
-        setDiscussionStatus(`Ready to discuss with server LLM (${ui.discussionLanguage.value}).`);
-      }
     });
     ui.discussionInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
@@ -341,6 +374,7 @@
     state.socket.send(JSON.stringify({ type: 'command', content: text }));
     log('user', text);
     ui.commandInput.value = '';
+    resetVoiceTranscript(ui.commandInput.value);
     autoResizeCommandInput();
     setAgentStatus('Waiting for User');
   }
@@ -402,6 +436,7 @@
       return;
     }
     ui.commandInput.value = state.lastSuggestion;
+    syncVoiceBaseToInput();
     autoResizeCommandInput();
     setDiscussionStatus('Suggestion copied to Command.');
   }
@@ -675,6 +710,263 @@
     ui.commandInput.style.height = `${next}px`;
   }
 
+  function handleCommandInput() {
+    autoResizeCommandInput();
+    if (!state.voiceRequested) return;
+    syncVoiceBaseToInput();
+  }
+
+  function syncVoiceBaseToInput() {
+    resetVoiceTranscript(ui.commandInput.value, state.voiceRequested);
+  }
+
+  function resetVoiceTranscript(baseValue = '', preserveSession = false) {
+    state.voiceBaseValue = baseValue;
+    state.voiceCommittedTranscript = '';
+    state.voiceFinalTranscript = '';
+    state.voiceInterimTranscript = '';
+    if (preserveSession) {
+      state.voiceResultOffset = state.voiceResultCount;
+      return;
+    }
+    state.voiceResultOffset = 0;
+    state.voiceResultCount = 0;
+  }
+
+  function commitVoiceTranscript() {
+    state.voiceCommittedTranscript += state.voiceFinalTranscript;
+    state.voiceFinalTranscript = '';
+    state.voiceInterimTranscript = '';
+    state.voiceResultOffset = 0;
+    state.voiceResultCount = 0;
+  }
+
+  function joinVoiceInput(baseValue, transcript) {
+    const base = String(baseValue || '');
+    const spoken = String(transcript || '');
+    if (!base) return spoken.trim();
+    if (!spoken) return base;
+    const needsSpacer = !/\s$/.test(base) && !/^[\s,.!?]/.test(spoken);
+    return `${base}${needsSpacer ? ' ' : ''}${spoken.trimStart()}`;
+  }
+
+  function renderVoiceTranscript() {
+    const transcript = `${state.voiceCommittedTranscript}${state.voiceFinalTranscript}${state.voiceInterimTranscript}`;
+    ui.commandInput.value = joinVoiceInput(state.voiceBaseValue, transcript);
+    autoResizeCommandInput();
+  }
+
+  function setLiveViewVisible(visible) {
+    state.liveViewVisible = Boolean(visible);
+    ui.liveSection.hidden = !state.liveViewVisible;
+    ui.tvToggleBtn.textContent = state.liveViewVisible ? 'TV OFF' : 'TV ON';
+    ui.tvToggleBtn.setAttribute('aria-pressed', state.liveViewVisible ? 'true' : 'false');
+  }
+
+  function toggleLiveView() {
+    setLiveViewVisible(!state.liveViewVisible);
+  }
+
+  function setOpenDrawer(name) {
+    state.openDrawer = name;
+
+    const isGuideOpen = name === 'guide';
+    const isDiscussionOpen = name === 'discussion';
+    const isSystemOpen = name === 'system';
+
+    ui.guideDrawer.classList.toggle('is-open', isGuideOpen);
+    ui.discussionDrawer.classList.toggle('is-open', isDiscussionOpen);
+    ui.systemDrawer.classList.toggle('is-open', isSystemOpen);
+    ui.drawerBackdrop.classList.toggle('is-open', Boolean(name));
+
+    ui.guideDrawerBtn.classList.toggle('is-active', isGuideOpen);
+    ui.discussionDrawerBtn.classList.toggle('is-active', isDiscussionOpen);
+    ui.systemDrawerBtn.classList.toggle('is-active', isSystemOpen);
+
+    ui.guideDrawerBtn.setAttribute('aria-pressed', isGuideOpen ? 'true' : 'false');
+    ui.discussionDrawerBtn.setAttribute('aria-pressed', isDiscussionOpen ? 'true' : 'false');
+    ui.systemDrawerBtn.setAttribute('aria-pressed', isSystemOpen ? 'true' : 'false');
+  }
+
+  function toggleDrawer(name) {
+    if (state.openDrawer === name) {
+      setOpenDrawer('');
+      return;
+    }
+    if (name === 'discussion') {
+      setDiscussionStatus(`Ready to discuss with server LLM (${ui.discussionLanguage.value}).`);
+    }
+    setOpenDrawer(name);
+  }
+
+  function updateVoiceButtonState() {
+    const active = state.voiceRequested;
+    ui.voiceBtn.classList.toggle('live-ring', active);
+    ui.voiceBtn.classList.toggle('is-recording', active);
+    if (ui.voiceBtnLabel) {
+      ui.voiceBtnLabel.textContent = active ? 'STOP' : 'MIC';
+    } else {
+      ui.voiceBtn.textContent = active ? 'STOP' : 'MIC';
+    }
+    ui.voiceBtn.setAttribute('aria-label', active ? '실시간 음성 입력 중지' : '실시간 음성 입력 시작');
+    ui.voiceBtn.title = active ? '실시간 음성 입력 중지' : '실시간 음성 입력 시작';
+  }
+
+  function clearVoiceIdleTimer() {
+    if (!state.voiceIdleTimer) return;
+    clearTimeout(state.voiceIdleTimer);
+    state.voiceIdleTimer = null;
+  }
+
+  function scheduleVoiceIdleStop(delayMs) {
+    clearVoiceIdleTimer();
+    if (!state.voiceRequested) return;
+    state.voiceIdleTimer = setTimeout(() => {
+      state.voiceIdleTimer = null;
+      if (!state.voiceRequested) return;
+      stopVoiceRecognition('idle');
+    }, delayMs);
+  }
+
+  function getVoiceStopHint() {
+    if (state.voiceStopReason === 'idle') {
+      return '말이 멈춰서 마이크를 자동 종료했습니다. 다시 말하려면 B 버튼을 누르세요.';
+    }
+    return '마이크 꺼짐. B 버튼을 누르면 실시간 입력이 시작됩니다.';
+  }
+
+  function clearVoiceRestartTimer() {
+    if (!state.voiceRestartTimer) return;
+    clearTimeout(state.voiceRestartTimer);
+    state.voiceRestartTimer = null;
+  }
+
+  function ensureVoiceRecognition() {
+    if (state.voiceRecognition) return state.voiceRecognition;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ko-KR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      state.isListening = true;
+      state.voiceStopReason = '';
+      updateVoiceButtonState();
+      scheduleVoiceIdleStop(4500);
+      ui.voiceHint.textContent = '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.';
+    };
+
+    recognition.onresult = (event) => {
+      if (state.voiceResultOffset > event.results.length) {
+        state.voiceResultOffset = 0;
+      }
+
+      let finalTranscript = '';
+      let interimTranscript = '';
+
+      for (let i = state.voiceResultOffset; i < event.results.length; i += 1) {
+        const segment = event.results[i][0]?.transcript || '';
+        if (event.results[i].isFinal) {
+          finalTranscript += segment;
+        } else {
+          interimTranscript += segment;
+        }
+      }
+
+      state.voiceResultCount = event.results.length;
+      state.voiceFinalTranscript = finalTranscript;
+      state.voiceInterimTranscript = interimTranscript;
+      renderVoiceTranscript();
+      scheduleVoiceIdleStop(2200);
+      ui.voiceHint.textContent = '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.';
+    };
+
+    recognition.onerror = (event) => {
+      const error = event.error || 'unknown';
+      if (error === 'aborted' && !state.voiceRequested) return;
+      clearVoiceIdleTimer();
+
+      if (error === 'not-allowed' || error === 'service-not-allowed' || error === 'audio-capture') {
+        state.voiceRequested = false;
+        clearVoiceRestartTimer();
+      }
+
+      updateVoiceButtonState();
+      ui.voiceHint.textContent = `마이크 오류: ${error}`;
+      log('error', `Voice input error: ${error}`);
+    };
+
+    recognition.onend = () => {
+      state.isListening = false;
+      clearVoiceIdleTimer();
+      commitVoiceTranscript();
+      renderVoiceTranscript();
+
+      if (state.voiceRequested) {
+        ui.voiceHint.textContent = '마이크를 다시 연결하는 중입니다. 계속 말하면 입력이 이어집니다.';
+        clearVoiceRestartTimer();
+        state.voiceRestartTimer = setTimeout(() => {
+          state.voiceRestartTimer = null;
+          if (!state.voiceRequested || state.isListening) return;
+          startVoiceRecognition();
+        }, 200);
+        return;
+      }
+
+      updateVoiceButtonState();
+      ui.voiceHint.textContent = getVoiceStopHint();
+    };
+
+    state.voiceRecognition = recognition;
+    return recognition;
+  }
+
+  function startVoiceRecognition() {
+    const recognition = ensureVoiceRecognition();
+    if (!recognition) {
+      state.voiceRequested = false;
+      updateVoiceButtonState();
+      ui.voiceHint.textContent = '현재 브라우저는 음성 인식을 지원하지 않습니다.';
+      log('error', 'Web Speech API unavailable');
+      return;
+    }
+
+    try {
+      recognition.start();
+    } catch (error) {
+      if (error && error.name === 'InvalidStateError') return;
+      state.voiceRequested = false;
+      updateVoiceButtonState();
+      ui.voiceHint.textContent = `마이크 오류: ${error.message}`;
+      log('error', `Voice input start failed: ${error.message}`);
+    }
+  }
+
+  function stopVoiceRecognition(reason = 'manual') {
+    state.voiceStopReason = reason;
+    state.voiceRequested = false;
+    clearVoiceRestartTimer();
+    clearVoiceIdleTimer();
+    updateVoiceButtonState();
+
+    if (!state.voiceRecognition || !state.isListening) {
+      ui.voiceHint.textContent = getVoiceStopHint();
+      return;
+    }
+
+    try {
+      state.voiceRecognition.stop();
+    } catch (error) {
+      ui.voiceHint.textContent = `마이크 오류: ${error.message}`;
+      log('error', `Voice input stop failed: ${error.message}`);
+    }
+  }
+
   function startDebugMonitors() {
     setInterval(() => {
       const now = Date.now();
@@ -708,7 +1000,7 @@
 
   function updateConnectionBadge(text, classNames) {
     ui.connectionBadge.textContent = text;
-    ui.connectionBadge.className = `rounded-full border px-2 py-1 text-xs font-semibold ${classNames}`;
+    ui.connectionBadge.className = `hud-chip rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${classNames}`;
   }
 
   function escapeHtml(str) {
@@ -721,52 +1013,23 @@
   }
 
   function toggleVoiceInput() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      ui.voiceHint.textContent = 'Speech recognition is not supported on this browser.';
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+      ui.voiceHint.textContent = '현재 브라우저는 음성 인식을 지원하지 않습니다.';
       log('error', 'Web Speech API unavailable');
       return;
     }
 
-    if (state.isListening) {
-      if (window.__civRecognition) window.__civRecognition.stop();
+    if (state.voiceRequested) {
+      stopVoiceRecognition('manual');
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    window.__civRecognition = recognition;
-    recognition.lang = 'ko-KR';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      state.isListening = true;
-      ui.voiceBtn.classList.add('live-ring');
-      ui.voiceHint.textContent = 'Listening...';
-    };
-
-    recognition.onresult = (event) => {
-      let transcript = '';
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        transcript += event.results[i][0].transcript;
-      }
-      ui.commandInput.value = transcript.trim();
-      autoResizeCommandInput();
-      ui.voiceHint.textContent = 'Voice captured. Review and send.';
-    };
-
-    recognition.onerror = (event) => {
-      ui.voiceHint.textContent = `Voice error: ${event.error}`;
-      log('error', `Voice input error: ${event.error}`);
-    };
-
-    recognition.onend = () => {
-      state.isListening = false;
-      ui.voiceBtn.classList.remove('live-ring');
-    };
-
-    recognition.start();
+    state.voiceRequested = true;
+    state.voiceStopReason = '';
+    resetVoiceTranscript(ui.commandInput.value);
+    updateVoiceButtonState();
+    ui.voiceHint.textContent = '마이크 준비 중... 잠시 후 바로 실시간 입력이 시작됩니다.';
+    startVoiceRecognition();
   }
 
   init();

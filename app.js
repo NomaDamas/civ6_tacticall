@@ -17,6 +17,8 @@
     discussionPending: false,
     discussionTypingEl: null,
     liveViewVisible: false,
+    discussionPanelVisible: false,
+    supportBayVisible: false,
     openDrawer: '',
     voiceRecognition: null,
     voiceRequested: false,
@@ -38,9 +40,15 @@
     connectionBadge: document.getElementById('connectionBadge'),
     agentStatus: document.getElementById('agentStatus'),
     statusDot: document.getElementById('statusDot'),
+    controlTabBtn: document.getElementById('controlTabBtn'),
+    discussionTabBtn: document.getElementById('discussionTabBtn'),
+    workspaceShell: document.getElementById('workspaceShell'),
+    coreColumn: document.getElementById('coreColumn'),
     liveView: document.getElementById('liveView'),
     liveMeta: document.getElementById('liveMeta'),
     liveSection: document.getElementById('liveSection'),
+    tvToggleLabel: document.getElementById('tvToggleLabel'),
+    voiceStateBadge: document.getElementById('voiceStateBadge'),
     startAgentBtn: document.getElementById('startAgentBtn'),
     stopAgentBtn: document.getElementById('stopAgentBtn'),
     commandInput: document.getElementById('commandInput'),
@@ -48,12 +56,14 @@
     voiceBtn: document.getElementById('voiceBtn'),
     voiceBtnLabel: document.getElementById('voiceBtnLabel'),
     tvToggleBtn: document.getElementById('tvToggleBtn'),
+    discussionToggleBtn: document.getElementById('discussionToggleBtn'),
+    discussionPanel: document.getElementById('discussionPanel'),
+    discussionCloseBtn: document.getElementById('discussionCloseBtn'),
+    supportToggleBtn: document.getElementById('supportToggleBtn'),
+    supportBay: document.getElementById('supportBay'),
     guideDrawerBtn: document.getElementById('guideDrawerBtn'),
-    discussionDrawerBtn: document.getElementById('discussionDrawerBtn'),
     systemDrawerBtn: document.getElementById('systemDrawerBtn'),
-    drawerBackdrop: document.getElementById('drawerBackdrop'),
     guideDrawer: document.getElementById('guideDrawer'),
-    discussionDrawer: document.getElementById('discussionDrawer'),
     systemDrawer: document.getElementById('systemDrawer'),
     voiceHint: document.getElementById('voiceHint'),
     discussionLanguage: document.getElementById('discussionLanguage'),
@@ -79,9 +89,13 @@
     bindEvents();
     renderAgentState({});
     autoResizeCommandInput();
+    autoResizeDiscussionInput();
     updateVoiceButtonState();
+    setVoiceStatus('MIC OFF', 'muted', getVoiceStopHint());
     setLiveViewVisible(false);
     setOpenDrawer('');
+    setDiscussionPanelVisible(false);
+    setSupportBayVisible(false);
     startDebugMonitors();
     connect();
     log('system', 'Controller initialized');
@@ -107,16 +121,27 @@
     ui.startAgentBtn.addEventListener('click', () => sendControl('start'));
     ui.stopAgentBtn.addEventListener('click', () => sendControl('stop'));
     ui.tvToggleBtn.addEventListener('click', toggleLiveView);
+    ui.controlTabBtn.addEventListener('click', () => setDiscussionPanelVisible(false));
+    ui.discussionTabBtn.addEventListener('click', () => setDiscussionPanelVisible(true));
+    ui.discussionToggleBtn.addEventListener('click', toggleDiscussionPanel);
+    ui.discussionCloseBtn.addEventListener('click', () => setDiscussionPanelVisible(false));
+    ui.supportToggleBtn.addEventListener('click', toggleSupportBay);
     ui.guideDrawerBtn.addEventListener('click', () => toggleDrawer('guide'));
-    ui.discussionDrawerBtn.addEventListener('click', () => toggleDrawer('discussion'));
     ui.systemDrawerBtn.addEventListener('click', () => toggleDrawer('system'));
-    ui.drawerBackdrop.addEventListener('click', () => setOpenDrawer(''));
     document.querySelectorAll('[data-drawer-close]').forEach((button) => {
       button.addEventListener('click', () => setOpenDrawer(''));
     });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && state.openDrawer) {
         setOpenDrawer('');
+        return;
+      }
+      if (event.key === 'Escape' && state.discussionPanelVisible) {
+        setDiscussionPanelVisible(false);
+        return;
+      }
+      if (event.key === 'Escape' && state.supportBayVisible) {
+        setSupportBayVisible(false);
       }
     });
     ui.commandInput.addEventListener('keydown', (event) => {
@@ -134,6 +159,7 @@
       localStorage.setItem(DISCUSSION_LANG_KEY, ui.discussionLanguage.value);
       setDiscussionStatus(`Language set: ${ui.discussionLanguage.value}`);
     });
+    ui.discussionInput.addEventListener('input', autoResizeDiscussionInput);
     ui.discussionInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
@@ -428,6 +454,7 @@
       }),
     );
     ui.discussionInput.value = '';
+    autoResizeDiscussionInput();
   }
 
   function useLastSuggestion() {
@@ -704,10 +731,19 @@
     ui.liveMeta.textContent = [fpsText, sizeText, `frames:${state.frameCount}`].filter(Boolean).join(' | ') || 'Streaming';
   }
 
+  function autoResizeTextarea(element, minHeight, maxHeight) {
+    if (!element) return;
+    element.style.height = 'auto';
+    const next = Math.max(minHeight, Math.min(element.scrollHeight, maxHeight));
+    element.style.height = `${next}px`;
+  }
+
   function autoResizeCommandInput() {
-    ui.commandInput.style.height = 'auto';
-    const next = Math.max(56, Math.min(ui.commandInput.scrollHeight, 220));
-    ui.commandInput.style.height = `${next}px`;
+    autoResizeTextarea(ui.commandInput, 52, 220);
+  }
+
+  function autoResizeDiscussionInput() {
+    autoResizeTextarea(ui.discussionInput, 52, 168);
   }
 
   function handleCommandInput() {
@@ -759,42 +795,90 @@
   function setLiveViewVisible(visible) {
     state.liveViewVisible = Boolean(visible);
     ui.liveSection.hidden = !state.liveViewVisible;
-    ui.tvToggleBtn.textContent = state.liveViewVisible ? 'TV OFF' : 'TV ON';
+    ui.coreColumn.classList.toggle('has-live', state.liveViewVisible);
+    if (ui.tvToggleLabel) {
+      ui.tvToggleLabel.textContent = state.liveViewVisible ? 'ON' : 'OFF';
+    }
     ui.tvToggleBtn.setAttribute('aria-pressed', state.liveViewVisible ? 'true' : 'false');
+    ui.tvToggleBtn.classList.toggle('is-active', state.liveViewVisible);
+    ui.tvToggleBtn.setAttribute('aria-label', state.liveViewVisible ? '스트리밍 끄기' : '스트리밍 켜기');
+    ui.tvToggleBtn.title = state.liveViewVisible ? '스트리밍 끄기' : '스트리밍 켜기';
   }
 
   function toggleLiveView() {
     setLiveViewVisible(!state.liveViewVisible);
   }
 
+  function setSupportBayVisible(visible) {
+    state.supportBayVisible = Boolean(visible);
+    if (!state.supportBayVisible) {
+      setOpenDrawer('');
+    }
+    ui.supportBay.hidden = !state.supportBayVisible;
+    ui.supportBay.classList.toggle('is-open', state.supportBayVisible);
+    ui.supportToggleBtn.classList.toggle('is-active', state.supportBayVisible);
+    ui.supportToggleBtn.setAttribute('aria-expanded', state.supportBayVisible ? 'true' : 'false');
+    ui.supportToggleBtn.setAttribute('aria-label', state.supportBayVisible ? '보조 메뉴 닫기' : '보조 메뉴 열기');
+    ui.supportToggleBtn.title = state.supportBayVisible ? '보조 메뉴 닫기' : '보조 메뉴 열기';
+  }
+
+  function toggleSupportBay() {
+    setSupportBayVisible(!state.supportBayVisible);
+  }
+
+  function setDiscussionPanelVisible(visible) {
+    state.discussionPanelVisible = Boolean(visible);
+    ui.discussionPanel.hidden = !state.discussionPanelVisible;
+    ui.discussionPanel.classList.toggle('is-open', state.discussionPanelVisible);
+    ui.discussionToggleBtn.classList.toggle('is-active', state.discussionPanelVisible);
+    ui.discussionToggleBtn.setAttribute('aria-expanded', state.discussionPanelVisible ? 'true' : 'false');
+    ui.controlTabBtn.classList.toggle('is-active', !state.discussionPanelVisible);
+    ui.discussionTabBtn.classList.toggle('is-active', state.discussionPanelVisible);
+    ui.workspaceShell.classList.toggle('has-discussion', state.discussionPanelVisible);
+    if (state.discussionPanelVisible) {
+      setDiscussionStatus(`Ready to discuss with server LLM (${ui.discussionLanguage.value}).`);
+    }
+  }
+
+  function toggleDiscussionPanel() {
+    setDiscussionPanelVisible(!state.discussionPanelVisible);
+  }
+
   function setOpenDrawer(name) {
     state.openDrawer = name;
 
     const isGuideOpen = name === 'guide';
-    const isDiscussionOpen = name === 'discussion';
     const isSystemOpen = name === 'system';
 
     ui.guideDrawer.classList.toggle('is-open', isGuideOpen);
-    ui.discussionDrawer.classList.toggle('is-open', isDiscussionOpen);
     ui.systemDrawer.classList.toggle('is-open', isSystemOpen);
-    ui.drawerBackdrop.classList.toggle('is-open', Boolean(name));
+    ui.guideDrawer.hidden = !isGuideOpen;
+    ui.systemDrawer.hidden = !isSystemOpen;
 
     ui.guideDrawerBtn.classList.toggle('is-active', isGuideOpen);
-    ui.discussionDrawerBtn.classList.toggle('is-active', isDiscussionOpen);
     ui.systemDrawerBtn.classList.toggle('is-active', isSystemOpen);
 
     ui.guideDrawerBtn.setAttribute('aria-pressed', isGuideOpen ? 'true' : 'false');
-    ui.discussionDrawerBtn.setAttribute('aria-pressed', isDiscussionOpen ? 'true' : 'false');
     ui.systemDrawerBtn.setAttribute('aria-pressed', isSystemOpen ? 'true' : 'false');
+    ui.guideDrawerBtn.setAttribute('aria-expanded', isGuideOpen ? 'true' : 'false');
+    ui.systemDrawerBtn.setAttribute('aria-expanded', isSystemOpen ? 'true' : 'false');
+
+    if (ui.supportBay) {
+      ui.supportBay.classList.toggle('has-open-panel', Boolean(name));
+      ui.supportBay.dataset.activePanel = name || 'none';
+      if (name && window.matchMedia('(max-width: 960px)').matches) {
+        ui.supportBay.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   }
 
   function toggleDrawer(name) {
+    if (!state.supportBayVisible) {
+      setSupportBayVisible(true);
+    }
     if (state.openDrawer === name) {
       setOpenDrawer('');
       return;
-    }
-    if (name === 'discussion') {
-      setDiscussionStatus(`Ready to discuss with server LLM (${ui.discussionLanguage.value}).`);
     }
     setOpenDrawer(name);
   }
@@ -810,6 +894,19 @@
     }
     ui.voiceBtn.setAttribute('aria-label', active ? '실시간 음성 입력 중지' : '실시간 음성 입력 시작');
     ui.voiceBtn.title = active ? '실시간 음성 입력 중지' : '실시간 음성 입력 시작';
+  }
+
+  function setVoiceStatus(badgeText, tone = 'muted', hintText = '') {
+    if (ui.voiceStateBadge) {
+      ui.voiceStateBadge.textContent = badgeText;
+      ui.voiceStateBadge.classList.toggle('is-active', tone === 'active');
+      ui.voiceStateBadge.classList.toggle('is-muted', tone === 'muted');
+      ui.voiceStateBadge.classList.toggle('is-warm', tone === 'warm');
+      ui.voiceStateBadge.classList.toggle('is-danger', tone === 'danger');
+    }
+    if (ui.voiceHint) {
+      ui.voiceHint.textContent = hintText || badgeText;
+    }
   }
 
   function clearVoiceIdleTimer() {
@@ -858,7 +955,7 @@
       state.voiceStopReason = '';
       updateVoiceButtonState();
       scheduleVoiceIdleStop(4500);
-      ui.voiceHint.textContent = '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.';
+      setVoiceStatus('MIC LIVE', 'active', '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.');
     };
 
     recognition.onresult = (event) => {
@@ -883,7 +980,7 @@
       state.voiceInterimTranscript = interimTranscript;
       renderVoiceTranscript();
       scheduleVoiceIdleStop(2200);
-      ui.voiceHint.textContent = '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.';
+      setVoiceStatus('MIC LIVE', 'active', '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.');
     };
 
     recognition.onerror = (event) => {
@@ -897,7 +994,7 @@
       }
 
       updateVoiceButtonState();
-      ui.voiceHint.textContent = `마이크 오류: ${error}`;
+      setVoiceStatus('MIC ERR', 'danger', `마이크 오류: ${error}`);
       log('error', `Voice input error: ${error}`);
     };
 
@@ -908,7 +1005,7 @@
       renderVoiceTranscript();
 
       if (state.voiceRequested) {
-        ui.voiceHint.textContent = '마이크를 다시 연결하는 중입니다. 계속 말하면 입력이 이어집니다.';
+        setVoiceStatus('MIC RETRY', 'warm', '마이크를 다시 연결하는 중입니다. 계속 말하면 입력이 이어집니다.');
         clearVoiceRestartTimer();
         state.voiceRestartTimer = setTimeout(() => {
           state.voiceRestartTimer = null;
@@ -919,7 +1016,7 @@
       }
 
       updateVoiceButtonState();
-      ui.voiceHint.textContent = getVoiceStopHint();
+      setVoiceStatus('MIC OFF', 'muted', getVoiceStopHint());
     };
 
     state.voiceRecognition = recognition;
@@ -931,7 +1028,7 @@
     if (!recognition) {
       state.voiceRequested = false;
       updateVoiceButtonState();
-      ui.voiceHint.textContent = '현재 브라우저는 음성 인식을 지원하지 않습니다.';
+      setVoiceStatus('MIC N/A', 'danger', '현재 브라우저는 음성 인식을 지원하지 않습니다.');
       log('error', 'Web Speech API unavailable');
       return;
     }
@@ -942,7 +1039,7 @@
       if (error && error.name === 'InvalidStateError') return;
       state.voiceRequested = false;
       updateVoiceButtonState();
-      ui.voiceHint.textContent = `마이크 오류: ${error.message}`;
+      setVoiceStatus('MIC ERR', 'danger', `마이크 오류: ${error.message}`);
       log('error', `Voice input start failed: ${error.message}`);
     }
   }
@@ -955,14 +1052,14 @@
     updateVoiceButtonState();
 
     if (!state.voiceRecognition || !state.isListening) {
-      ui.voiceHint.textContent = getVoiceStopHint();
+      setVoiceStatus('MIC OFF', 'muted', getVoiceStopHint());
       return;
     }
 
     try {
       state.voiceRecognition.stop();
     } catch (error) {
-      ui.voiceHint.textContent = `마이크 오류: ${error.message}`;
+      setVoiceStatus('MIC ERR', 'danger', `마이크 오류: ${error.message}`);
       log('error', `Voice input stop failed: ${error.message}`);
     }
   }
@@ -1014,7 +1111,7 @@
 
   function toggleVoiceInput() {
     if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
-      ui.voiceHint.textContent = '현재 브라우저는 음성 인식을 지원하지 않습니다.';
+      setVoiceStatus('MIC N/A', 'danger', '현재 브라우저는 음성 인식을 지원하지 않습니다.');
       log('error', 'Web Speech API unavailable');
       return;
     }
@@ -1028,7 +1125,7 @@
     state.voiceStopReason = '';
     resetVoiceTranscript(ui.commandInput.value);
     updateVoiceButtonState();
-    ui.voiceHint.textContent = '마이크 준비 중... 잠시 후 바로 실시간 입력이 시작됩니다.';
+    setVoiceStatus('MIC ARM', 'warm', '마이크 준비 중... 잠시 후 바로 실시간 입력이 시작됩니다.');
     startVoiceRecognition();
   }
 

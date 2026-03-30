@@ -1,3 +1,5 @@
+<img width="1364" height="711" alt="readme_page" src="https://github.com/user-attachments/assets/06798cbd-08ec-405f-b2ce-460c0077927a" />
+
 # Civ_tacticall
 
 Standalone browser-based controller for Civ agent play.

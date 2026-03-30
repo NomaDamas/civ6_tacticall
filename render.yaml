@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ojirapper
+    name: civ-tacticall-controller
     env: node
     plan: free
     buildCommand: npm install

@@ -546,13 +546,10 @@
       .action-cluster {
         position: relative;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        grid-template-rows: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-        min-height: 258px;
-        padding: 14px;
-        width: min(100%, 320px);
-        border-radius: 28px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        width: min(100%, 360px);
+        border-radius: 24px;
         background:
           radial-gradient(circle at 28% 28%, rgba(255, 255, 255, 0.08), transparent 30%),
           linear-gradient(180deg, rgba(76, 86, 99, 0.34) 0%, rgba(22, 26, 33, 0.92) 100%);
@@ -575,16 +572,16 @@
       .face-btn {
         position: relative;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        justify-content: center;
-        justify-self: center;
-        align-self: center;
-        width: clamp(72px, 22vw, 92px);
-        height: clamp(72px, 22vw, 92px);
+        justify-content: flex-start;
+        width: 100%;
+        min-height: 88px;
         border: none;
-        border-radius: 9999px;
+        border-radius: 22px;
         color: #fffdf8;
+        padding: 0 16px;
+        gap: 14px;
         box-shadow:
           0 18px 30px rgba(0, 0, 0, 0.28),
           inset 0 -14px 18px rgba(0, 0, 0, 0.28),
@@ -593,27 +590,32 @@
 
       .face-btn-letter {
         font-family: 'Press Start 2P', 'Noto Sans KR', sans-serif;
-        font-size: 1.04rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 9999px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(8, 10, 13, 0.18);
+        font-size: 0.68rem;
         line-height: 1;
       }
 
       .face-btn-label {
-        margin-top: 10px;
-        font-size: 0.74rem;
+        margin-top: 0;
+        font-size: 0.72rem;
         font-weight: 700;
         letter-spacing: 0.08em;
+        text-align: left;
       }
 
       .face-btn-a {
         background: radial-gradient(circle at 32% 28%, var(--send-top) 0%, #f2b64b 48%, var(--send-bottom) 100%);
-        grid-column: 3;
-        grid-row: 2;
       }
 
       .face-btn-b {
         background: radial-gradient(circle at 32% 28%, var(--mic-top) 0%, #dd6258 48%, var(--mic-bottom) 100%);
-        grid-column: 2;
-        grid-row: 3;
       }
 
       .face-btn.is-recording {
@@ -622,14 +624,10 @@
 
       .face-btn-x {
         background: radial-gradient(circle at 32% 28%, #8ec8ff 0%, #4f7fd8 50%, #26406f 100%);
-        grid-column: 2;
-        grid-row: 1;
       }
 
       .face-btn-y {
         background: radial-gradient(circle at 32% 28%, #b9ea7e 0%, #6ba748 50%, #355525 100%);
-        grid-column: 1;
-        grid-row: 2;
       }
 
       .secondary-actions {
@@ -1252,6 +1250,10 @@
           padding: 12px;
         }
 
+        .face-btn {
+          min-height: 74px;
+        }
+
         .command-input {
           min-height: 0;
         }
@@ -1287,45 +1289,24 @@
         .action-cluster {
           width: 100%;
           min-height: auto;
-          padding: 0;
+          padding: 10px;
           gap: 10px;
-          background: none;
-          border: none;
-          box-shadow: none;
-        }
-
-        .action-cluster::before {
-          display: none;
         }
 
         .face-btn {
-          width: 100%;
-          max-width: none;
-          height: auto;
-          min-height: 56px;
+          min-height: 64px;
           border-radius: 18px;
-          justify-content: flex-start;
-          flex-direction: row;
-          gap: 12px;
           padding: 0 14px;
         }
 
         .face-btn-letter {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
           width: 30px;
           height: 30px;
-          border-radius: 9999px;
-          border: 1px solid rgba(255, 255, 255, 0.16);
-          background: rgba(9, 12, 17, 0.22);
           font-size: 0.64rem;
         }
 
         .face-btn-label {
-          margin-top: 0;
           font-size: 0.68rem;
-          text-align: left;
         }
       }
 

@@ -13,6 +13,11 @@ npm install
 npm run dev
 ```
 
+Important:
+
+- your phone and the computer running CivStation/Civilization VI must be connected to the same Wi-Fi network
+- if they are on different networks, pairing and control may fail or behave inconsistently
+
 Open:
 
 ```bash

@@ -29,6 +29,7 @@
     voiceInterimTranscript: '',
     voiceResultOffset: 0,
     voiceResultCount: 0,
+    voiceShellPulseTimer: null,
     voiceIdleTimer: null,
     voiceStopReason: 'manual',
   };
@@ -40,6 +41,7 @@
     connectionBadge: document.getElementById('connectionBadge'),
     agentStatus: document.getElementById('agentStatus'),
     statusDot: document.getElementById('statusDot'),
+    consoleShell: document.getElementById('consoleShell'),
     controlTabBtn: document.getElementById('controlTabBtn'),
     discussionTabBtn: document.getElementById('discussionTabBtn'),
     workspaceShell: document.getElementById('workspaceShell'),
@@ -102,6 +104,8 @@
   }
 
   function bindEvents() {
+    bindPressFeedback();
+
     ui.connectBtn.addEventListener('click', () => {
       if (state.socket && state.socket.readyState === WebSocket.OPEN) {
         state.manuallyClosed = true;
@@ -169,6 +173,19 @@
     ui.clearLogsBtn.addEventListener('click', () => {
       ui.logs.innerHTML = '';
       log('system', 'Logs cleared');
+    });
+  }
+
+  function bindPressFeedback() {
+    document.querySelectorAll('.pressable-btn').forEach((button) => {
+      const clearPressed = () => button.classList.remove('is-pressed');
+      button.addEventListener('pointerdown', () => {
+        button.classList.add('is-pressed');
+      });
+      button.addEventListener('pointerup', clearPressed);
+      button.addEventListener('pointercancel', clearPressed);
+      button.addEventListener('pointerleave', clearPressed);
+      button.addEventListener('blur', clearPressed);
     });
   }
 
@@ -887,6 +904,7 @@
     const active = state.voiceRequested;
     ui.voiceBtn.classList.toggle('live-ring', active);
     ui.voiceBtn.classList.toggle('is-recording', active);
+    setVoiceShellActive(active);
     if (ui.voiceBtnLabel) {
       ui.voiceBtnLabel.textContent = active ? 'STOP' : 'MIC';
     } else {
@@ -907,6 +925,32 @@
     if (ui.voiceHint) {
       ui.voiceHint.textContent = hintText || badgeText;
     }
+  }
+
+  function setVoiceShellActive(active) {
+    if (!ui.consoleShell) return;
+    ui.consoleShell.classList.toggle('voice-active', Boolean(active));
+    if (!active) {
+      ui.consoleShell.classList.remove('voice-speaking');
+      if (state.voiceShellPulseTimer) {
+        clearTimeout(state.voiceShellPulseTimer);
+        state.voiceShellPulseTimer = null;
+      }
+    }
+  }
+
+  function pulseVoiceShell() {
+    if (!ui.consoleShell) return;
+    ui.consoleShell.classList.remove('voice-speaking');
+    void ui.consoleShell.offsetWidth;
+    ui.consoleShell.classList.add('voice-speaking');
+    if (state.voiceShellPulseTimer) {
+      clearTimeout(state.voiceShellPulseTimer);
+    }
+    state.voiceShellPulseTimer = setTimeout(() => {
+      ui.consoleShell.classList.remove('voice-speaking');
+      state.voiceShellPulseTimer = null;
+    }, 460);
   }
 
   function clearVoiceIdleTimer() {
@@ -956,6 +1000,7 @@
       updateVoiceButtonState();
       scheduleVoiceIdleStop(4500);
       setVoiceStatus('MIC LIVE', 'active', '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.');
+      pulseVoiceShell();
     };
 
     recognition.onresult = (event) => {
@@ -981,6 +1026,9 @@
       renderVoiceTranscript();
       scheduleVoiceIdleStop(2200);
       setVoiceStatus('MIC LIVE', 'active', '실시간 입력 중입니다. 말이 멈추면 마이크가 자동 종료됩니다.');
+      if (finalTranscript.trim() || interimTranscript.trim()) {
+        pulseVoiceShell();
+      }
     };
 
     recognition.onerror = (event) => {
